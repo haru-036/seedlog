@@ -1,4 +1,5 @@
 {
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "seedlog-api",
   "main": "src/index.ts",
   "compatibility_date": "2025-01-01",
