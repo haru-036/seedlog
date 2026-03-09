@@ -1,11 +1,15 @@
 {
   "name": "api",
   "version": "0.0.1",
-  "type": "module",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "lint": "oxlint .",
+    "fmt": "oxfmt .",
+    "fmt:check": "oxfmt --check .",
+    "check": "oxfmt . && oxlint .",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

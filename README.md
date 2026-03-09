@@ -29,6 +29,8 @@ bun install
 
 ### 開発サーバーの起動
 
+全パッケージを一括起動する場合：
+
 ```sh
 bun run dev
 ```
@@ -36,12 +38,24 @@ bun run dev
 - フロントエンド: http://localhost:5173
 - API: http://localhost:8787
 
+担当パッケージだけを起動する場合：
+
+```sh
+# フロントエンドのみ
+cd web && bun run dev
+
+# API のみ
+cd api && bun run dev
+```
+
 ## よく使うコマンド
 
 ```sh
 bun run dev          # 全パッケージを並列で開発起動
 bun run build        # 全パッケージをビルド
 bun run type-check   # 全パッケージの型チェック
+bun run fmt          # コードフォーマット（oxfmt）
+bun run lint         # リント（oxlint）
 ```
 
 ## スキーマの追加方法

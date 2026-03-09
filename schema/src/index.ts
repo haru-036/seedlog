@@ -5,7 +5,7 @@ export const seedLogSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
   plantedAt: z.string().datetime(),
-  notes: z.string().optional(),
+  notes: z.string().optional()
 });
 
 export const createSeedLogSchema = seedLogSchema.omit({ id: true });

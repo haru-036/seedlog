@@ -20,6 +20,9 @@ bun install          # 全パッケージの依存関係をインストール
 bun run dev          # 全パッケージを並列で開発起動
 bun run build        # 全パッケージをビルド（依存順）
 bun run type-check   # 全パッケージの型チェック
+bun run fmt          # コードフォーマット（oxfmt）
+bun run fmt:check    # フォーマットチェックのみ（CI用）
+bun run lint         # リント（oxlint）
 ```
 
 各パッケージ単体で実行する場合は `apps/api` や `apps/web` に移動してから実行。
