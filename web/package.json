@@ -1,0 +1,28 @@
+{
+  "name": "web",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "tsc --noEmit",
+    "type-check": "tsc --noEmit",
+    "preview": "vite preview",
+    "deploy": "bun run build && wrangler deploy"
+  },
+  "dependencies": {
+    "@seedlog/schema": "workspace:*",
+    "@tailwindcss/vite": "^4.2.1",
+    "react": "^18",
+    "react-dom": "^18",
+    "tailwindcss": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@vitejs/plugin-react": "^4",
+    "typescript": "^5",
+    "vite": "^6"
+  }
+}

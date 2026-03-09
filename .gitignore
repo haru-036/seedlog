@@ -1,0 +1,39 @@
+# dependencies
+node_modules
+
+# build outputs
+dist
+out
+*.tgz
+
+# Turborepo
+.turbo
+
+# Wrangler (Cloudflare Workers / Pages)
+.wrangler
+.dev.vars
+
+# environment variables
+.env
+.env.*
+!.env.example
+
+# TypeScript
+*.tsbuildinfo
+
+# test / coverage
+coverage
+*.lcov
+
+# logs
+logs
+*.log
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# caches
+.eslintcache
+.cache
+
+# OS / Editor
+.DS_Store
+.idea
