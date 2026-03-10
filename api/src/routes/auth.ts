@@ -9,6 +9,7 @@ import {
   githubCallbackQuerySchema
 } from "@seedlog/schema";
 import { oauthCodes, users } from "../db/schema";
+import { encryptToken } from "../lib/token-crypto";
 
 const authRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -213,7 +214,7 @@ authRoute.get(
   "/github/callback",
   zValidator("query", githubCallbackQuerySchema),
   async (c) => {
-    const { code, error } = c.req.valid("query");
+    const { code, error, state: returnedState } = c.req.valid("query");
     const frontendError = (reason: string) =>
       c.redirect(`${c.env.FRONTEND_URL}/auth/error?reason=${reason}`);
 
@@ -221,7 +222,6 @@ authRoute.get(
 
     // CSRF: validate state
     const storedState = getCookie(c, "github_oauth_state");
-    const returnedState = c.req.query("state");
     deleteCookie(c, "github_oauth_state", { path: "/" });
 
     if (!storedState || !returnedState || storedState !== returnedState) {
@@ -271,6 +271,8 @@ authRoute.get(
 
     const githubUser = (await userRes.json()) as { login: string };
 
+    const encryptedToken = await encryptToken(tokenData.access_token, c.env.GITHUB_TOKEN_ENCRYPTION_KEY);
+
     const db = drizzle(c.env.DB);
     const user = await db
       .select()
@@ -282,16 +284,26 @@ authRoute.get(
       // 既存ユーザー → token を更新
       await db
         .update(users)
-        .set({ githubAccessToken: tokenData.access_token })
+        .set({ githubAccessToken: encryptedToken })
         .where(eq(users.id, user.id));
     } else {
       // 新規ユーザー → 自動作成
       await db.insert(users).values({
         id: nanoid(),
         githubLogin: githubUser.login,
-        githubAccessToken: tokenData.access_token
+        githubAccessToken: encryptedToken
       });
     }
+
+    // Set an httpOnly cookie so the server can identify the authenticated GitHub user
+    // without trusting client-supplied values in subsequent API calls.
+    setCookie(c, "github_user", githubUser.login, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      path: "/"
+    });
 
     const redirectUrl = new URL(`${c.env.FRONTEND_URL}/auth/github/callback`);
     redirectUrl.searchParams.set("githubLogin", githubUser.login);

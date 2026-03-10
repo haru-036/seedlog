@@ -1,9 +1,11 @@
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
+import { getCookie } from "hono/cookie";
 import { zValidator } from "@hono/zod-validator";
 import { registerWebhookSchema } from "@seedlog/schema";
 import { createDb } from "../db";
 import { users } from "../db/schema";
+import { decryptToken } from "../lib/token-crypto";
 
 const webhooksRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -11,7 +13,23 @@ webhooksRoute.post(
   "/register",
   zValidator("json", registerWebhookSchema),
   async (c) => {
-    const { githubLogin, repo } = c.req.valid("json");
+    if (!c.env.GITHUB_WEBHOOK_SECRET) {
+      console.error("GITHUB_WEBHOOK_SECRET is required but not set");
+      return c.json(
+        { error: { code: "INTERNAL_ERROR", message: "GITHUB_WEBHOOK_SECRET is required" } },
+        500
+      );
+    }
+
+    const githubLogin = getCookie(c, "github_user");
+    if (!githubLogin) {
+      return c.json(
+        { error: { code: "UNAUTHORIZED", message: "GitHub認証が必要です" } },
+        401
+      );
+    }
+
+    const { repo } = c.req.valid("json");
     const db = createDb(c.env.DB);
 
     const user = await db
@@ -38,13 +56,15 @@ webhooksRoute.post(
       );
     }
 
+    const accessToken = await decryptToken(user.githubAccessToken, c.env.GITHUB_TOKEN_ENCRYPTION_KEY);
+
     const [owner, repoName] = repo.split("/");
     const res = await fetch(
       `https://api.github.com/repos/${owner}/${repoName}/hooks`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${user.githubAccessToken}`,
+          Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
           "User-Agent": "seedlog-api"
         },
@@ -63,8 +83,14 @@ webhooksRoute.post(
     );
 
     if (res.status === 422) {
-      // 422 = すでに同じ webhook が登録済み
-      return c.json({ ok: true, message: "webhookはすでに登録済みです" });
+      const body = (await res.json()) as { errors?: { resource: string; code: string; message: string }[] };
+      const isAlreadyExists = body.errors?.some(
+        (e) => e.resource === "Hook" && e.code === "custom" && e.message === "Hook already exists on this repository"
+      );
+      if (isAlreadyExists) {
+        return c.json({ ok: true, message: "webhookはすでに登録済みです" });
+      }
+      return c.json({ ok: false, error: body }, 422);
     }
 
     if (!res.ok) {

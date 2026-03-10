@@ -97,7 +97,7 @@ X-GitHub-Event: push
 
 ---
 
-## Discord連携
+## GitHub連携
 
 ### `GET /api/auth/github` ✅ 実装済み
 
@@ -164,20 +164,20 @@ error?: string
 
 ```typescript
 {
-  githubLogin: string; // 登録済みユーザーのGitHub login
-  repo: string;        // "owner/repo" 形式
+  repo: string; // "owner/repo" 形式（認証ユーザーを github_user cookie から解決）
 }
 ```
 
 **処理の流れ**
 
-1. githubLogin でユーザーを検索し `githubAccessToken` を取得
-2. GitHub API `POST /repos/{owner}/{repo}/hooks` を呼び出し
-3. Webhook URL: `GITHUB_WEBHOOK_URL`、イベント: `push`、署名: `GITHUB_WEBHOOK_SECRET`
+1. `github_user` cookie から認証済みユーザーの GitHub login を解決
+2. DB の users テーブルから githubLogin でユーザーを検索し、暗号化された `githubAccessToken` を取得・復号
+3. GitHub API `POST /repos/{owner}/{repo}/hooks` を呼び出し
+4. Webhook URL: `GITHUB_WEBHOOK_URL`、イベント: `push`、署名: `GITHUB_WEBHOOK_SECRET`
 
 **必要な環境変数**
 
-- `GITHUB_WEBHOOK_URL`, `GITHUB_WEBHOOK_SECRET`
+- `GITHUB_WEBHOOK_URL`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_TOKEN_ENCRYPTION_KEY`
 
 **Response** `201 Created`
 
@@ -187,14 +187,18 @@ error?: string
 
 **Error Responses**
 
-- `401 Unauthorized` — GitHub 未連携（githubAccessToken が未設定）
+- `401 Unauthorized` — `github_user` cookie が未設定、または GitHub 未連携（githubAccessToken が未設定）
 - `404 Not Found` — ユーザーが見つからない
 - `200 OK` — すでに同じ Webhook が登録済み（`{ ok: true, message: "webhookはすでに登録済みです" }`）
+- `422 Unprocessable Entity` — GitHub API バリデーションエラー（重複以外）
+- `500 Internal Server Error` — `GITHUB_WEBHOOK_SECRET` が未設定
 - `502 Bad Gateway` — GitHub API エラー
 
 ---
 
+## Discord連携
 
+### `GET /api/auth/discord` ✅ 実装済み
 
 Discord OAuth 認証フローを開始する。
 
