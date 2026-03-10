@@ -38,6 +38,17 @@
 
 ユーザー情報を取得。
 
+**Response**
+
+```typescript
+{
+  id: string;
+  discordId: string;
+  githubLogin: string;
+  createdAt: string;
+}
+```
+
 ---
 
 ## GitHub Webhook
