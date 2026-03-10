@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { nanoid } from "nanoid";
 import { githubPushPayloadSchema } from "@seedlog/schema";
 import { createDb } from "../db";
+import { generateQuestion } from "../lib/gemini";
 import { questions, users } from "../db/schema";
 
 const githubRoute = new Hono<{ Bindings: CloudflareBindings }>();
@@ -71,13 +72,20 @@ githubRoute.post("/github", async (c) => {
     ...new Set(commits.flatMap((commit) => [...commit.added, ...commit.modified]))
   ];
 
+  let questionText: string;
+  try {
+    questionText = await generateQuestion(c.env.GEMINI_API_KEY, changedFiles);
+  } catch {
+    questionText = "今日のコードで一番詰まったところはどこでしたか？";
+  }
+
   await db.insert(questions).values({
     id: nanoid(),
     userId: user.id,
     githubRepo: repository.full_name,
     commitSha: head_commit.id,
     changedFiles: JSON.stringify(changedFiles),
-    questionText: "AI生成予定"
+    questionText
   });
 
   return c.json({ ok: true });
