@@ -8,7 +8,8 @@
     {
       "binding": "DB",
       "database_name": "seedlog",
-      "database_id": "b0a550b2-268a-4476-987b-ad2119f33512"
+      "database_id": "b0a550b2-268a-4476-987b-ad2119f33512",
+      "migrations_dir": "drizzle"
     }
   ]
 }
