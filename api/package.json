@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "wrangler d1 migrations apply seedlog --local",
+    "deploy": "wrangler deploy --minify",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "generate": "drizzle-kit generate",
+    "migration:local": "wrangler d1 migrations apply seedlog --local",
+    "migration:remote": "wrangler d1 migrations apply seedlog --remote",
     "lint": "oxlint .",
     "fmt": "oxfmt .",
     "fmt:check": "oxfmt --check .",
@@ -15,13 +17,13 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@hono/zod-validator": "^0.4",
+    "@hono/zod-validator": "^0.7.6",
     "@seedlog/schema": "workspace:*",
     "drizzle-orm": "^0.45.1",
-    "hono": "^4"
+    "hono": "^4.12.6"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4",
+    "@cloudflare/workers-types": "^4.20260310.1",
     "drizzle-kit": "^0.31.9",
     "typescript": "^5",
     "wrangler": "^4.71.0"

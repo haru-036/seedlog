@@ -7,7 +7,7 @@ Bun + Turborepo によるモノレポ構成。
 ```
 seedlog/
 ├── api/          # Hono API → Cloudflare Workers
-├── web/          # Vite + React → Cloudflare Pages
+├── web/          # Vite + React → Cloudflare Workers (Static Assets)
 ├── schema/       # 共通 Zod スキーマ (@seedlog/schema)
 ├── turbo.json
 └── package.json
@@ -25,7 +25,7 @@ bun run fmt:check    # フォーマットチェックのみ（CI用）
 bun run lint         # リント（oxlint）
 ```
 
-各パッケージ単体で実行する場合は `apps/api` や `apps/web` に移動してから実行。
+各パッケージ単体で実行する場合は `api/` や `web/` に移動してから実行。
 
 ## 各パッケージの詳細
 
@@ -42,7 +42,7 @@ export const exampleSchema = z.object({ ... });
 export type Example = z.infer<typeof exampleSchema>;
 ```
 
-### apps/api (Hono + Cloudflare Workers)
+### api/ (Hono + Cloudflare Workers)
 
 - ランタイムは Cloudflare Workers
 - `export default app` でエントリポイントを公開する（`Bun.serve()` は使わない）
@@ -54,24 +54,25 @@ bun run dev      # wrangler dev でローカル起動
 bun run deploy   # wrangler deploy で本番デプロイ
 ```
 
-### apps/web (Vite + React + Tailwind CSS → Cloudflare Pages)
+### web/ (Vite + React + Tailwind CSS → Cloudflare Workers Static Assets)
 
 - Tailwind CSS v4（`tailwind.config.js` 不要、`@import "tailwindcss"` のみ）
 - スキーマの型は `@seedlog/schema` から import して使う
-- `wrangler.jsonc` で Pages の設定を管理
+- `@cloudflare/vite-plugin` で Cloudflare Workers にデプロイ
+- `wrangler.jsonc` で Workers の設定を管理
 
 ```sh
 bun run dev      # Vite dev server 起動（port 5173）
 bun run build    # 本番ビルド（dist/ に出力）
-bun run deploy   # ビルド → wrangler pages deploy
+bun run deploy   # ビルド → wrangler deploy
 ```
 
 ## デプロイ
 
-| パッケージ | サービス           | コマンド         |
-| ---------- | ------------------ | ---------------- |
-| apps/api   | Cloudflare Workers | `bun run deploy` |
-| apps/web   | Cloudflare Pages   | `bun run deploy` |
+| パッケージ | サービス                          | コマンド         |
+| ---------- | --------------------------------- | ---------------- |
+| api/       | Cloudflare Workers                | `bun run deploy` |
+| web/       | Cloudflare Workers (Static Assets) | `bun run deploy` |
 
 初回は `wrangler login` で認証が必要。
 
