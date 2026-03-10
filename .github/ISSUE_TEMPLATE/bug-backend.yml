@@ -1,0 +1,57 @@
+name: "🐛 バグ (バックエンド)"
+description: "APIやDBで何かおかしいとき"
+title: "[Bug/BE] "
+labels: ["backend", "bug"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: "何が起きてる？"
+      placeholder: "例: POST /api/users でユーザー登録すると500になる"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "どうしたら再現できる？"
+      placeholder: |
+        1. POST /api/users に { "discordId": "123", "githubLogin": "xxx" } を送る
+        2. 500が返ってくる
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "本来こうなるはず"
+      placeholder: "例: 201 Created でユーザー情報が返ってくる"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: "でも実際はこう"
+      placeholder: |
+        500 Internal Server Error
+        { "error": "..." }
+    validations:
+      required: true
+
+  - type: input
+    id: endpoint
+    attributes:
+      label: "エンドポイント（任意）"
+      placeholder: "例: POST /api/users"
+    validations:
+      required: false
+
+  - type: textarea
+    id: error-response
+    attributes:
+      label: "エラーログ（任意）"
+      description: "Cloudflare Workers のログとかあれば"
+      render: "shell"
+    validations:
+      required: false

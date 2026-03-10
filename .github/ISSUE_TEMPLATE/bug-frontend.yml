@@ -1,0 +1,51 @@
+name: "🐛 バグ (フロントエンド)"
+description: "フロントエンドで何かおかしいとき"
+title: "[Bug/FE] "
+labels: ["frontend", "bug"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: "何が起きてる？"
+      placeholder: "例: ログ一覧ページが真っ白になる"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "どうしたら再現できる？"
+      placeholder: |
+        1. トップページを開く
+        2. 「ログ一覧」をクリック
+        3. 真っ白になる
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "本来こうなるはず"
+      placeholder: "例: ログ一覧が表示される"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: "でも実際はこう"
+      placeholder: "例: 真っ白。コンソールに「Cannot read properties of undefined」が出てる"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: "ブラウザ・OS（任意）"
+      placeholder: "例: Chrome / Mac"
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: "スクリーンショットあればそのまま貼ってください 📸"

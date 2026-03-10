@@ -81,3 +81,47 @@ bun run deploy   # ビルド → wrangler pages deploy
 - **`any` は使わない** — strict モードを維持する
 - **新しいパッケージマネージャーは使わない** — Bun のみ（`npm` / `yarn` / `pnpm` 禁止）
 - **フロントのフレームワーク追加時は Vite プラグイン経由** — `@tailwindcss/vite` のように
+
+## git・gh コマンドの実行ルール
+
+`git commit` / `git push` / `gh issue create` など**リポジトリの状態を変更するコマンドは、必ず実行前にユーザーの承認を得ること**。
+
+承認不要（読み取り専用）: `git status`, `git log`, `git diff`, `gh issue list` など。
+
+## ドキュメント更新ルール
+
+`docs/` 配下のファイルは以下のルールで管理する。
+
+### いつ更新するか
+
+| 変更内容 | 更新するファイル |
+|---------|---------------|
+| APIエンドポイントの追加・変更・削除 | `docs/api.md` |
+| DBスキーマの変更（テーブル・カラム） | `docs/architecture.md` |
+| 設計上の意思決定（なぜそうするか・何を却下したか） | `docs/decisions.md` |
+| 技術スタックの変更 | `docs/architecture.md` |
+
+### docs/api.md
+
+- エンドポイントを追加・変更したら **必ず同時に更新する**
+- リクエスト/レスポンスの型はDBスキーマ（`api/src/db/schema.ts`）と一致させる
+- 未実装・将来対応予定の機能は `> P2: 〜` のように注記する
+
+### docs/decisions.md
+
+- **ADR（Architecture Decision Record）形式** で書く
+- 一度書いたADRは削除しない（変更した場合は新しいADRを追加して旧ADRに参照を書く）
+- フォーマット:
+  ```
+  ## ADR-NNN: タイトル
+  **日付:** YYYY-MM-DD
+  **状況:** なぜこの決定が必要だったか
+  **決定:** 何を決めたか
+  **理由:** なぜそう決めたか
+  **却下した選択肢:** 何を検討して却下したか
+  ```
+
+### docs/architecture.md
+
+- 意思決定の詳細は書かない（decisions.mdに書く）
+- 技術スタック表・構成図・データフローを最新に保つ

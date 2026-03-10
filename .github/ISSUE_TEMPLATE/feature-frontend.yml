@@ -1,0 +1,34 @@
+name: "📋 タスク (フロントエンド)"
+description: "フロントエンド（画面・UI）でやること"
+title: "[FE] "
+labels: ["frontend", "enhancement"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: "何する？"
+      placeholder: "例: ログ一覧ページに検索バーをつける"
+    validations:
+      required: true
+
+  - type: textarea
+    id: hints
+    attributes:
+      label: "メモ・参考（任意）"
+      description: "関係しそうなファイルとか、参考UIとか、思いついたことを自由に"
+      placeholder: |
+        - web/src/pages/Logs.tsx あたりを触る感じ？
+        - Linear の検索が参考になりそう
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "優先度"
+      options:
+        - "P0 — 必須"
+        - "P1 — あると良い"
+        - "P2 — 余裕あれば"
+    validations:
+      required: true

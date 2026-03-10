@@ -3,5 +3,12 @@
   "name": "seedlog-api",
   "main": "src/index.ts",
   "compatibility_date": "2025-01-01",
-  "compatibility_flags": ["nodejs_compat"]
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "seedlog",
+      "database_id": "b0a550b2-268a-4476-987b-ad2119f33512"
+    }
+  ]
 }

@@ -1,0 +1,43 @@
+name: "📋 タスク (バックエンド)"
+description: "バックエンド（API・DB）でやること"
+title: "[BE] "
+labels: ["backend", "enhancement"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: "何する？"
+      placeholder: "例: GET /api/logs にページネーションを追加する"
+    validations:
+      required: true
+
+  - type: input
+    id: endpoint
+    attributes:
+      label: "関係するエンドポイント（任意）"
+      placeholder: "例: GET /api/logs"
+    validations:
+      required: false
+
+  - type: textarea
+    id: hints
+    attributes:
+      label: "メモ・参考（任意）"
+      description: "関係しそうなファイルとか、思いついたことを自由に"
+      placeholder: |
+        - api/src/routes/logs.ts あたりを触る感じ
+        - limit / offset クエリパラメータを追加する
+        - docs/api.md も更新が必要かも
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "優先度"
+      options:
+        - "P0 — 必須"
+        - "P1 — あると良い"
+        - "P2 — 余裕あれば"
+    validations:
+      required: true
