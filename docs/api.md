@@ -99,7 +99,102 @@ X-GitHub-Event: push
 
 ## Discord連携
 
-### `GET /api/auth/discord` ✅ 実装済み
+### `GET /api/auth/github` ✅ 実装済み
+
+GitHub OAuth 認証フローを開始する。
+
+**処理の流れ**
+
+1. CSRF 対策用のランダム state を生成し `github_oauth_state` cookie にセット（httpOnly, Secure, SameSite=Lax, 5分）
+2. GitHub の OAuth 認可画面へリダイレクト（scope: `admin:repo_hook read:user`）
+
+**必要な環境変数**
+
+- `GITHUB_CLIENT_ID`, `GITHUB_REDIRECT_URI`
+
+**レスポンス**
+
+- `302 Redirect` → GitHub 認可画面
+
+---
+
+### `GET /api/auth/github/callback` ✅ 実装済み
+
+GitHub OAuth コールバックを受け取る。
+
+**Query Parameters**
+
+```
+code?: string
+error?: string
+```
+
+**処理の流れ**
+
+1. CSRF state の検証
+2. GitHub に code でアクセストークンを交換
+3. GitHub ユーザー情報（login）を取得
+4. DB の users テーブルから githubLogin でユーザーを検索
+5. `githubAccessToken` を DB に保存
+6. フロントエンドへリダイレクト
+
+**必要な環境変数**
+
+- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_REDIRECT_URI`, `FRONTEND_URL`
+
+**成功レスポンス**
+
+- `302 Redirect` → `${FRONTEND_URL}/auth/github/callback?githubLogin=<login>`
+
+**エラーレスポンス**
+
+- `302 Redirect` → `${FRONTEND_URL}/auth/error?reason=<reason>`
+  - `reason=state_mismatch` — CSRF 検証失敗
+  - `reason=token_exchange` — GitHub のトークン交換失敗
+  - `reason=user_fetch` — GitHub ユーザー情報取得失敗
+  - `reason=user_not_found` — seedlog に未登録のユーザー
+
+---
+
+### `POST /api/webhooks/register` ✅ 実装済み
+
+指定リポジトリに GitHub Webhook を自動登録する。
+
+**Request**
+
+```typescript
+{
+  githubLogin: string; // 登録済みユーザーのGitHub login
+  repo: string;        // "owner/repo" 形式
+}
+```
+
+**処理の流れ**
+
+1. githubLogin でユーザーを検索し `githubAccessToken` を取得
+2. GitHub API `POST /repos/{owner}/{repo}/hooks` を呼び出し
+3. Webhook URL: `GITHUB_WEBHOOK_URL`、イベント: `push`、署名: `GITHUB_WEBHOOK_SECRET`
+
+**必要な環境変数**
+
+- `GITHUB_WEBHOOK_URL`, `GITHUB_WEBHOOK_SECRET`
+
+**Response** `201 Created`
+
+```typescript
+{ ok: true; hookId: number }
+```
+
+**Error Responses**
+
+- `401 Unauthorized` — GitHub 未連携（githubAccessToken が未設定）
+- `404 Not Found` — ユーザーが見つからない
+- `200 OK` — すでに同じ Webhook が登録済み（`{ ok: true, message: "webhookはすでに登録済みです" }`）
+- `502 Bad Gateway` — GitHub API エラー
+
+---
+
+
 
 Discord OAuth 認証フローを開始する。
 
