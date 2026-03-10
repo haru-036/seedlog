@@ -16,7 +16,10 @@ async function discordFetch(botToken: string, path: string, init: RequestInit) {
   return res.json() as Promise<Record<string, unknown>>;
 }
 
-export async function createDMChannel(botToken: string, discordUserId: string): Promise<string> {
+export async function createDMChannel(
+  botToken: string,
+  discordUserId: string
+): Promise<string> {
   const data = await discordFetch(botToken, "/users/@me/channels", {
     method: "POST",
     body: JSON.stringify({ recipient_id: discordUserId })

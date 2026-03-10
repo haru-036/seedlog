@@ -9,14 +9,20 @@ import { questions, users } from "../db/schema";
 
 const githubRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
-async function verifySignature(secret: string, body: string, signature: string): Promise<boolean> {
+async function verifySignature(
+  secret: string,
+  body: string,
+  signature: string
+): Promise<boolean> {
   if (!signature.startsWith("sha256=")) return false;
   const hex = signature.slice(7);
   if (hex.length % 2 !== 0) return false;
 
   let signatureBytes: Uint8Array;
   try {
-    signatureBytes = new Uint8Array(hex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+    signatureBytes = new Uint8Array(
+      hex.match(/.{2}/g)!.map((b) => parseInt(b, 16))
+    );
   } catch {
     return false;
   }
@@ -29,7 +35,12 @@ async function verifySignature(secret: string, body: string, signature: string):
     false,
     ["verify"]
   );
-  return crypto.subtle.verify("HMAC", key, signatureBytes, encoder.encode(body));
+  return crypto.subtle.verify(
+    "HMAC",
+    key,
+    signatureBytes,
+    encoder.encode(body)
+  );
 }
 
 githubRoute.post("/github", async (c) => {
@@ -37,9 +48,16 @@ githubRoute.post("/github", async (c) => {
   const signature = c.req.header("X-Hub-Signature-256") ?? "";
   const body = await c.req.text();
 
-  const valid = await verifySignature(c.env.GITHUB_WEBHOOK_SECRET, body, signature);
+  const valid = await verifySignature(
+    c.env.GITHUB_WEBHOOK_SECRET,
+    body,
+    signature
+  );
   if (!valid) {
-    return c.json({ error: { code: "UNAUTHORIZED", message: "署名が無効です" } }, 401);
+    return c.json(
+      { error: { code: "UNAUTHORIZED", message: "署名が無効です" } },
+      401
+    );
   }
 
   if (event !== "push") {
@@ -50,10 +68,16 @@ githubRoute.post("/github", async (c) => {
   try {
     parsed = githubPushPayloadSchema.safeParse(JSON.parse(body));
   } catch {
-    return c.json({ error: { code: "BAD_REQUEST", message: "不正なpayload形式です" } }, 400);
+    return c.json(
+      { error: { code: "BAD_REQUEST", message: "不正なpayload形式です" } },
+      400
+    );
   }
   if (!parsed.success) {
-    return c.json({ error: { code: "BAD_REQUEST", message: "不正なpayload形式です" } }, 400);
+    return c.json(
+      { error: { code: "BAD_REQUEST", message: "不正なpayload形式です" } },
+      400
+    );
   }
 
   const { pusher, repository, head_commit, commits } = parsed.data;
@@ -64,13 +88,19 @@ githubRoute.post("/github", async (c) => {
 
   const db = createDb(c.env.DB);
 
-  const user = await db.select().from(users).where(eq(users.githubLogin, pusher.name)).get();
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.githubLogin, pusher.name))
+    .get();
   if (!user) {
     return c.json({ ok: true });
   }
 
   const changedFiles = [
-    ...new Set(commits.flatMap((commit) => [...commit.added, ...commit.modified]))
+    ...new Set(
+      commits.flatMap((commit) => [...commit.added, ...commit.modified])
+    )
   ];
 
   let questionText: string;
@@ -91,33 +121,49 @@ githubRoute.post("/github", async (c) => {
   });
 
   const sendDM = async () => {
+    if (!user.discordId) return; // Discord未連携はスキップ
     let messageId: string;
     try {
-      const channelId = await createDMChannel(c.env.DISCORD_BOT_TOKEN, user.discordId);
-      messageId = await sendDMMessage(c.env.DISCORD_BOT_TOKEN, channelId, questionText, {
-        components: [
-          {
-            type: 1, // ACTION_ROW
-            components: [
-              {
-                type: 2, // BUTTON
-                style: 1, // PRIMARY
-                label: "回答する",
-                custom_id: `open_reply_modal:${questionId}`
-              }
-            ]
-          }
-        ]
-      });
+      const channelId = await createDMChannel(
+        c.env.DISCORD_BOT_TOKEN,
+        user.discordId
+      );
+      messageId = await sendDMMessage(
+        c.env.DISCORD_BOT_TOKEN,
+        channelId,
+        questionText,
+        {
+          components: [
+            {
+              type: 1, // ACTION_ROW
+              components: [
+                {
+                  type: 2, // BUTTON
+                  style: 1, // PRIMARY
+                  label: "回答する",
+                  custom_id: `open_reply_modal:${questionId}`
+                }
+              ]
+            }
+          ]
+        }
+      );
     } catch (err) {
       console.error("Discord DM 送信エラー:", err);
       return;
     }
 
     try {
-      await db.update(questions).set({ discordMessageId: messageId }).where(eq(questions.id, questionId));
+      await db
+        .update(questions)
+        .set({ discordMessageId: messageId })
+        .where(eq(questions.id, questionId));
     } catch (err) {
-      console.error("Discord DM sent but failed to save discordMessageId:", { err, messageId, questionId });
+      console.error("Discord DM sent but failed to save discordMessageId:", {
+        err,
+        messageId,
+        questionId
+      });
     }
   };
   c.executionCtx.waitUntil(sendDM());

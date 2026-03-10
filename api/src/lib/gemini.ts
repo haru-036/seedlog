@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
-const QUESTION_PROMPT = (files: string[]) => `
+const QUESTION_PROMPT = (files: string[]) =>
+  `
 あなたはエンジニアの振り返りをサポートするコーチです。
 GitHubのpushで変更されたファイル一覧をもとに、エンジニアに投げかける振り返り質問を1つ生成してください。
 
@@ -16,7 +17,10 @@ ${files.join("\n")}
 質問文のみを出力してください（前置きや説明は不要）。
 `.trim();
 
-export async function generateQuestion(apiKey: string, changedFiles: string[]): Promise<string> {
+export async function generateQuestion(
+  apiKey: string,
+  changedFiles: string[]
+): Promise<string> {
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",

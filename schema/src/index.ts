@@ -3,13 +3,13 @@ import { z } from "zod";
 // ---- Users ----
 
 export const createUserSchema = z.object({
-  discordId: z.string().min(1, "discordIdは必須です"),
+  discordId: z.string().min(1, "discordIdは必須です").optional(),
   githubLogin: z.string().min(1, "githubLoginは必須です")
 });
 
 export const userResponseSchema = z.object({
   id: z.string(),
-  discordId: z.string(),
+  discordId: z.string().nullable(),
   githubLogin: z.string(),
   createdAt: z.string()
 });

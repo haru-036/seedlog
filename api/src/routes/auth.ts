@@ -4,7 +4,10 @@ import { zValidator } from "@hono/zod-validator";
 import { drizzle } from "drizzle-orm/d1";
 import { eq, lt } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { discordCallbackQuerySchema, githubCallbackQuerySchema } from "@seedlog/schema";
+import {
+  discordCallbackQuerySchema,
+  githubCallbackQuerySchema
+} from "@seedlog/schema";
 import { oauthCodes, users } from "../db/schema";
 
 const authRoute = new Hono<{ Bindings: CloudflareBindings }>();
@@ -22,8 +25,11 @@ function generateState(): string {
 }
 
 authRoute.get("/discord", (c) => {
-  const state = generateState();
-  setCookie(c, "discord_oauth_state", state, {
+  const githubLogin = c.req.query("githubLogin") ?? "";
+  const csrf = generateState();
+  // state に CSRF + githubLogin を JSON エンコードして埋め込む
+  const state = btoa(JSON.stringify({ csrf, githubLogin }));
+  setCookie(c, "discord_oauth_state", csrf, {
     httpOnly: true,
     secure: true,
     sameSite: "Lax",
@@ -53,11 +59,20 @@ authRoute.get(
     if (error || !code) return frontendError("oauth_error");
 
     // CSRF: validate state
-    const storedState = getCookie(c, "discord_oauth_state");
+    const storedCsrf = getCookie(c, "discord_oauth_state");
     const returnedState = c.req.query("state");
     deleteCookie(c, "discord_oauth_state", { path: "/" });
 
-    if (!storedState || !returnedState || storedState !== returnedState) {
+    let githubLogin = "";
+    if (returnedState) {
+      try {
+        const decoded = JSON.parse(atob(returnedState)) as { csrf: string; githubLogin: string };
+        if (!storedCsrf || decoded.csrf !== storedCsrf) return frontendError("state_mismatch");
+        githubLogin = decoded.githubLogin ?? "";
+      } catch {
+        return frontendError("state_mismatch");
+      }
+    } else {
       return frontendError("state_mismatch");
     }
 
@@ -99,6 +114,21 @@ authRoute.get(
     const onetimeCode = nanoid();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5分
 
+    // githubLogin があればユーザーに discordId を紐付け
+    if (githubLogin) {
+      const user = await db
+        .select()
+        .from(users)
+        .where(eq(users.githubLogin, githubLogin))
+        .get();
+      if (user) {
+        await db
+          .update(users)
+          .set({ discordId: discordUser.id })
+          .where(eq(users.id, user.id));
+      }
+    }
+
     // 期限切れコードを掃除してから新規追加
     await db.delete(oauthCodes).where(lt(oauthCodes.expiresAt, new Date()));
     await db.insert(oauthCodes).values({
@@ -118,7 +148,10 @@ authRoute.get(
 authRoute.get("/discord/token", async (c) => {
   const code = c.req.query("code");
   if (!code) {
-    return c.json({ error: { code: "BAD_REQUEST", message: "codeがありません" } }, 400);
+    return c.json(
+      { error: { code: "BAD_REQUEST", message: "codeがありません" } },
+      400
+    );
   }
 
   const db = drizzle(c.env.DB);
@@ -130,17 +163,26 @@ authRoute.get("/discord/token", async (c) => {
     .all();
 
   if (!row) {
-    return c.json({ error: { code: "NOT_FOUND", message: "コードが見つかりません" } }, 404);
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "コードが見つかりません" } },
+      404
+    );
   }
 
   if (row.expiresAt < new Date()) {
     await db.delete(oauthCodes).where(eq(oauthCodes.code, code));
-    return c.json({ error: { code: "GONE", message: "コードの有効期限が切れています" } }, 410);
+    return c.json(
+      { error: { code: "GONE", message: "コードの有効期限が切れています" } },
+      410
+    );
   }
 
   // 単一使用：取得後即削除
   await db.delete(oauthCodes).where(eq(oauthCodes.code, code));
-  return c.json({ discordId: row.discordId, discordUsername: row.discordUsername });
+  return c.json({
+    discordId: row.discordId,
+    discordUsername: row.discordUsername
+  });
 });
 
 // ---- GitHub OAuth ----
@@ -236,14 +278,20 @@ authRoute.get(
       .where(eq(users.githubLogin, githubUser.login))
       .get();
 
-    if (!user) {
-      return frontendError("user_not_found");
+    if (user) {
+      // 既存ユーザー → token を更新
+      await db
+        .update(users)
+        .set({ githubAccessToken: tokenData.access_token })
+        .where(eq(users.id, user.id));
+    } else {
+      // 新規ユーザー → 自動作成
+      await db.insert(users).values({
+        id: nanoid(),
+        githubLogin: githubUser.login,
+        githubAccessToken: tokenData.access_token
+      });
     }
-
-    await db
-      .update(users)
-      .set({ githubAccessToken: tokenData.access_token })
-      .where(eq(users.id, user.id));
 
     const redirectUrl = new URL(`${c.env.FRONTEND_URL}/auth/github/callback`);
     redirectUrl.searchParams.set("githubLogin", githubUser.login);

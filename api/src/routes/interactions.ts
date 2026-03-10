@@ -108,24 +108,41 @@ interactionsRoute.post("/", async (c) => {
   const body = await c.req.text();
 
   if (!signature || !timestamp) {
-    return c.json({ error: { code: "UNAUTHORIZED", message: "署名ヘッダーがありません" } }, 401);
+    return c.json(
+      { error: { code: "UNAUTHORIZED", message: "署名ヘッダーがありません" } },
+      401
+    );
   }
 
-  const isValid = await verifyDiscordSignature(c.env.DISCORD_PUBLIC_KEY, signature, timestamp, body);
+  const isValid = await verifyDiscordSignature(
+    c.env.DISCORD_PUBLIC_KEY,
+    signature,
+    timestamp,
+    body
+  );
   if (!isValid) {
-    return c.json({ error: { code: "UNAUTHORIZED", message: "署名が無効です" } }, 401);
+    return c.json(
+      { error: { code: "UNAUTHORIZED", message: "署名が無効です" } },
+      401
+    );
   }
 
   let rawPayload: unknown;
   try {
     rawPayload = JSON.parse(body);
   } catch {
-    return c.json({ error: { code: "BAD_REQUEST", message: "不正なpayload形式です" } }, 400);
+    return c.json(
+      { error: { code: "BAD_REQUEST", message: "不正なpayload形式です" } },
+      400
+    );
   }
 
   const parsed = discordInteractionSchema.safeParse(rawPayload);
   if (!parsed.success) {
-    return c.json({ error: { code: "BAD_REQUEST", message: "不正なpayload形式です" } }, 400);
+    return c.json(
+      { error: { code: "BAD_REQUEST", message: "不正なpayload形式です" } },
+      400
+    );
   }
   const interaction = parsed.data;
 
@@ -160,9 +177,10 @@ interactionsRoute.post("/", async (c) => {
       });
     }
 
-    const content = (interaction.data?.components ?? [])
-      .flatMap((row) => row.components ?? [])
-      .find((comp) => comp.type === 4)?.value ?? "";
+    const content =
+      (interaction.data?.components ?? [])
+        .flatMap((row) => row.components ?? [])
+        .find((comp) => comp.type === 4)?.value ?? "";
 
     if (!content.trim()) {
       return c.json({
@@ -172,11 +190,19 @@ interactionsRoute.post("/", async (c) => {
     }
 
     const db = createDb(c.env.DB);
-    const user = await db.select().from(users).where(eq(users.discordId, discordUserId)).get();
+    const user = await db
+      .select()
+      .from(users)
+      .where(eq(users.discordId, discordUserId))
+      .get();
     if (!user) {
       return c.json({
         type: RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: { content: "ユーザーが見つかりませんでした。まず `/register` でユーザー登録してください。", flags: 64 }
+        data: {
+          content:
+            "ユーザーが見つかりませんでした。まず `/register` でユーザー登録してください。",
+          flags: 64
+        }
       });
     }
 
@@ -202,7 +228,10 @@ interactionsRoute.post("/", async (c) => {
 
             if (updated.length === 0) {
               // 既回答 or 別ユーザーの質問
-              console.warn("question_reply: スキップ（既回答または権限なし）", { questionId, userId: user.id });
+              console.warn("question_reply: スキップ（既回答または権限なし）", {
+                questionId,
+                userId: user.id
+              });
               return;
             }
 
@@ -220,7 +249,10 @@ interactionsRoute.post("/", async (c) => {
       );
       return c.json({
         type: RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: { content: "回答を記録しました！振り返り、お疲れさまでした 🌱", flags: 64 }
+        data: {
+          content: "回答を記録しました！振り返り、お疲れさまでした 🌱",
+          flags: 64
+        }
       });
     }
 
@@ -243,7 +275,10 @@ interactionsRoute.post("/", async (c) => {
       );
       return c.json({
         type: RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: { content: "ログを記録しました！今日も成長、お疲れさまでした 🌱", flags: 64 }
+        data: {
+          content: "ログを記録しました！今日も成長、お疲れさまでした 🌱",
+          flags: 64
+        }
       });
     }
 
@@ -260,4 +295,3 @@ interactionsRoute.post("/", async (c) => {
 });
 
 export { interactionsRoute };
-
