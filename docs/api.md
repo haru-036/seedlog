@@ -68,7 +68,7 @@
 
 ## GitHub Webhook
 
-### `POST /api/webhooks/github`
+### `POST /api/webhooks/github` ✅ 実装済み
 
 GitHubからのpushイベントを受け取る。
 
@@ -81,10 +81,19 @@ X-GitHub-Event: push
 
 **処理の流れ**
 
-1. `X-Hub-Signature-256` でsignatureを検証
-2. コミット情報（ファイル名・変更回数・コミットメッセージ）をAI（Gemini）に渡して質問を生成
-3. Discord REST APIでユーザーにDMを送信
-4. questionsテーブルに質問とDiscordメッセージIDを保存
+1. `X-Hub-Signature-256` で HMAC-SHA256 署名を検証（`GITHUB_WEBHOOK_SECRET`）
+2. `push` 以外のイベントは無視して 200 を返す
+3. `pusher.name`（githubLogin）でユーザーを検索（未登録ユーザーは無視）
+4. コミットの `added` + `modified` ファイル一覧を抽出し questions テーブルに保存
+
+> `questionText` は現在 `"AI生成予定"` のプレースホルダー。#4 AI質問生成実装後に差し替え予定。
+
+**Error Responses**
+
+- `401 Unauthorized` — 署名が無効
+  ```json
+  { "error": { "code": "UNAUTHORIZED", "message": "署名が無効です" } }
+  ```
 
 ---
 

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "./db";
+import { githubRoute } from "./routes/github";
 import { usersRoute } from "./routes/users";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
@@ -16,5 +17,6 @@ app.get("/health", async (c) => {
 });
 
 app.route("/api/users", usersRoute);
+app.route("/api/webhooks", githubRoute);
 
 export default app;
