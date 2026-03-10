@@ -1,7 +1,7 @@
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
-  id: text("id").primaryKey(), // Discord user ID
+  id: text("id").primaryKey(), // nanoid で生成される一意の識別子（Discord ID は discordId フィールドに格納）
   discordId: text("discord_id").notNull().unique(),
   githubLogin: text("github_login").notNull().unique(),
   createdAt: integer("created_at", { mode: "timestamp" })
