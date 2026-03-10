@@ -2,11 +2,7 @@ import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "./db";
 
-type Env = {
-  DB: D1Database;
-};
-
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: CloudflareBindings }>();
 
 app.get("/", (c) => {
   return c.json({ message: "Seedlog API" });
