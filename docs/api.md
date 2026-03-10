@@ -27,7 +27,7 @@
 
 ```typescript
 {
-  id: string;        // UUID
+  id: string;        // nanoid() で生成される21文字のURL-safeな一意識別子
   discordId: string;
   githubLogin: string;
   createdAt: string; // ISO 8601
