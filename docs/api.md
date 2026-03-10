@@ -137,7 +137,7 @@ X-Signature-Timestamp: <timestamp>
 
 ```
 userId: string（必須）
-source?: 'github_push' | 'discord_command' | 'web'
+source?: 'github_push' | 'discord_reply' | 'discord_command' | 'web'
 limit?: number（デフォルト20）
 offset?: number
 ```
@@ -149,7 +149,7 @@ offset?: number
   logs: {
     id: string;
     content: string;
-    source: "github_push" | "discord_command" | "web";
+    source: "github_push" | "discord_reply" | "discord_command" | "web";
     questionId: string | null; // 紐づくquestionのID（手動追加の場合はnull）
     createdAt: string;
   }
