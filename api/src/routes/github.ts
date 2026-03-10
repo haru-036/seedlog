@@ -90,13 +90,16 @@ githubRoute.post("/github", async (c) => {
     questionText
   });
 
-  try {
-    const channelId = await createDMChannel(c.env.DISCORD_BOT_TOKEN, user.discordId);
-    const messageId = await sendDMMessage(c.env.DISCORD_BOT_TOKEN, channelId, questionText);
-    await db.update(questions).set({ discordMessageId: messageId }).where(eq(questions.id, questionId));
-  } catch (err) {
-    console.error("Discord DM 送信エラー:", err);
-  }
+  const sendDM = async () => {
+    try {
+      const channelId = await createDMChannel(c.env.DISCORD_BOT_TOKEN, user.discordId);
+      const messageId = await sendDMMessage(c.env.DISCORD_BOT_TOKEN, channelId, questionText);
+      await db.update(questions).set({ discordMessageId: messageId }).where(eq(questions.id, questionId));
+    } catch (err) {
+      console.error("Discord DM 送信エラー:", err);
+    }
+  };
+  c.executionCtx.waitUntil(sendDM());
 
   return c.json({ ok: true });
 });
