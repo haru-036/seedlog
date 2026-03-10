@@ -99,15 +99,31 @@ X-GitHub-Event: push
 
 ## Discord連携
 
-### `POST /api/interactions`
+### `POST /api/interactions` ✅ 実装済み
 
-DiscordからのInteractions（モーダル返信・スラッシュコマンド）を受け取る。
+DiscordからのInteractions（ボタン・モーダル返信・スラッシュコマンド）を受け取る。
+
+**Headers**
+
+```
+X-Signature-Ed25519: <signature>
+X-Signature-Timestamp: <timestamp>
+```
 
 **処理の流れ**
 
-1. Discordのリクエスト署名を検証（`DISCORD_PUBLIC_KEY`）
-2. `PING` リクエストに応答（Discord Endpoint URL検証用）
-3. Modal Submitの返信内容をlogsテーブルに保存（`source: 'discord_command'` または `'github_push'` に紐づく返信）
+1. Ed25519署名を検証（`DISCORD_PUBLIC_KEY`）
+2. `PING` に `PONG` を返す（Discord Endpoint URL検証用）
+3. ボタンクリック（`open_reply_modal:<questionId>`）→ 振り返りモーダルを表示
+4. モーダル送信（`question_reply:<questionId>`）→ logsテーブルに保存（`source: 'discord_reply'`）、questionの`answeredAt`を更新
+5. `/log` コマンドのモーダル送信（`log_entry`）→ logsテーブルに保存（`source: 'discord_command'`）
+
+**Error Responses**
+
+- `401 Unauthorized` — 署名が無効
+  ```json
+  { "error": { "code": "UNAUTHORIZED", "message": "署名が無効です" } }
+  ```
 
 ---
 

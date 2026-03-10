@@ -36,7 +36,7 @@ export const logs = sqliteTable("logs", {
   questionId: text("question_id").references(() => questions.id), // null if manually added
   content: text("content").notNull(),
   source: text("source")
-    .$type<"github_push" | "discord_command" | "web">()
+    .$type<"github_push" | "discord_command" | "discord_reply" | "web">()
     .notNull()
     .default("web"),
   createdAt: integer("created_at", { mode: "timestamp" })
