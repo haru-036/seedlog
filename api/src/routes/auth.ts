@@ -5,15 +5,14 @@ const authRoute = new Hono<{ Bindings: CloudflareBindings }>();
 const DISCORD_OAUTH_URL = "https://discord.com/api/oauth2/authorize";
 const DISCORD_TOKEN_URL = "https://discord.com/api/oauth2/token";
 const DISCORD_USER_URL = "https://discord.com/api/users/@me";
-const DISCORD_GUILD_MEMBER_URL = (guildId: string, userId: string) =>
-  `https://discord.com/api/v10/guilds/${guildId}/members/${userId}`;
 
 authRoute.get("/discord", (c) => {
   const params = new URLSearchParams({
     client_id: c.env.DISCORD_CLIENT_ID,
     redirect_uri: c.env.DISCORD_REDIRECT_URI,
     response_type: "code",
-    scope: "identify guilds.join"
+    scope: "identify bot",
+    permissions: "2048" // SEND_MESSAGES
   });
   return c.redirect(`${DISCORD_OAUTH_URL}?${params}`);
 });
@@ -55,22 +54,6 @@ authRoute.get("/discord/callback", async (c) => {
   }
 
   const discordUser = (await userRes.json()) as { id: string; username: string; global_name?: string };
-
-  // Seedlog サーバーに自動参加させる（Bot と共通サーバーを作ることで DM 送信を可能にする）
-  const joinRes = await fetch(DISCORD_GUILD_MEMBER_URL(c.env.SEEDLOG_GUILD_ID, discordUser.id), {
-    method: "PUT",
-    headers: {
-      Authorization: `Bot ${c.env.DISCORD_BOT_TOKEN}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ access_token: tokenData.access_token })
-  });
-
-  if (!joinRes.ok && joinRes.status !== 204) {
-    const text = await joinRes.text();
-    console.error("Discord guild join error:", text);
-    // サーバー参加失敗はエラーにせず続行（既参加の場合など）
-  }
 
   const redirectUrl = new URL(`${c.env.FRONTEND_URL}/auth/discord/callback`);
   redirectUrl.searchParams.set("discordId", discordUser.id);

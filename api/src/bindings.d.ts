@@ -3,7 +3,6 @@ declare interface CloudflareBindings {
   DISCORD_CLIENT_ID: string;
   DISCORD_CLIENT_SECRET: string;
   DISCORD_REDIRECT_URI: string;
-  SEEDLOG_GUILD_ID: string;
   FRONTEND_URL: string;
   // GitHub OAuth (#26)
   GITHUB_CLIENT_ID: string;
