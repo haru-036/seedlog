@@ -1,51 +1,38 @@
-name: "🐛 バグ報告 (バックエンド)"
-description: "バックエンド（API・DB）のバグやエラーを報告する"
+name: "🐛 バグ (バックエンド)"
+description: "APIやDBで何かおかしいとき"
 title: "[Bug/BE] "
 labels: ["backend", "bug"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        バグの報告ありがとうございます！
-        再現手順とエラーの詳細を書いてもらえると修正しやすくなります 🙏
-
   - type: input
     id: summary
     attributes:
-      label: "🐛 バグの概要"
-      description: "何が起きているか一言で"
-      placeholder: "例: POST /api/users でユーザー登録するとエラーになる"
+      label: "何が起きてる？"
+      placeholder: "例: POST /api/users でユーザー登録すると500になる"
     validations:
       required: true
 
   - type: textarea
     id: steps
     attributes:
-      label: "🔁 再現手順"
-      description: "どうすれば再現できるか、順を追って教えてください"
+      label: "どうしたら再現できる？"
       placeholder: |
-        1. POST /api/users に以下のリクエストを送る
-           { "discordId": "123456", "githubLogin": "username" }
-        2. 500エラーが返ってくる
+        1. POST /api/users に { "discordId": "123", "githubLogin": "xxx" } を送る
+        2. 500が返ってくる
     validations:
       required: true
 
   - type: textarea
     id: expected
     attributes:
-      label: "✅ 期待する動作"
-      description: "本来どうなるべきか（期待するレスポンスなど）"
-      placeholder: |
-        201 Created が返り、登録したユーザー情報が返ってくる
-        { "id": "...", "discordId": "123456", ... }
+      label: "本来こうなるはず"
+      placeholder: "例: 201 Created でユーザー情報が返ってくる"
     validations:
       required: true
 
   - type: textarea
     id: actual
     attributes:
-      label: "❌ 実際の動作"
-      description: "実際に返ってきたエラーやレスポンスを貼り付けてください"
+      label: "でも実際はこう"
       placeholder: |
         500 Internal Server Error
         { "error": "..." }
@@ -55,8 +42,7 @@ body:
   - type: input
     id: endpoint
     attributes:
-      label: "🔗 エンドポイント（任意）"
-      description: "問題が発生しているAPIエンドポイント"
+      label: "エンドポイント（任意）"
       placeholder: "例: POST /api/users"
     validations:
       required: false
@@ -64,8 +50,8 @@ body:
   - type: textarea
     id: error-response
     attributes:
-      label: "📋 エラーレスポンス・ログ（任意）"
-      description: "エラーの詳細やCloudflare Workersのログがあれば貼り付けてください"
+      label: "エラーログ（任意）"
+      description: "Cloudflare Workers のログとかあれば"
       render: "shell"
     validations:
       required: false
