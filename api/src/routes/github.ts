@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { nanoid } from "nanoid";
 import { githubPushPayloadSchema } from "@seedlog/schema";
 import { createDb } from "../db";
+import { createDMChannel, sendDMMessage } from "../lib/discord";
 import { generateQuestion } from "../lib/gemini";
 import { questions, users } from "../db/schema";
 
@@ -79,14 +80,33 @@ githubRoute.post("/github", async (c) => {
     questionText = "今日のコードで一番詰まったところはどこでしたか？";
   }
 
+  const questionId = nanoid();
   await db.insert(questions).values({
-    id: nanoid(),
+    id: questionId,
     userId: user.id,
     githubRepo: repository.full_name,
     commitSha: head_commit.id,
     changedFiles: JSON.stringify(changedFiles),
     questionText
   });
+
+  const sendDM = async () => {
+    let messageId: string;
+    try {
+      const channelId = await createDMChannel(c.env.DISCORD_BOT_TOKEN, user.discordId);
+      messageId = await sendDMMessage(c.env.DISCORD_BOT_TOKEN, channelId, questionText);
+    } catch (err) {
+      console.error("Discord DM 送信エラー:", err);
+      return;
+    }
+
+    try {
+      await db.update(questions).set({ discordMessageId: messageId }).where(eq(questions.id, questionId));
+    } catch (err) {
+      console.error("Discord DM sent but failed to save discordMessageId:", { err, messageId, questionId });
+    }
+  };
+  c.executionCtx.waitUntil(sendDM());
 
   return c.json({ ok: true });
 });
