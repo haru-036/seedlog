@@ -82,6 +82,12 @@ bun run deploy   # ビルド → wrangler pages deploy
 - **新しいパッケージマネージャーは使わない** — Bun のみ（`npm` / `yarn` / `pnpm` 禁止）
 - **フロントのフレームワーク追加時は Vite プラグイン経由** — `@tailwindcss/vite` のように
 
+## git・gh コマンドの実行ルール
+
+`git commit` / `git push` / `gh issue create` など**リポジトリの状態を変更するコマンドは、必ず実行前にユーザーの承認を得ること**。
+
+承認不要（読み取り専用）: `git status`, `git log`, `git diff`, `gh issue list` など。
+
 ## ドキュメント更新ルール
 
 `docs/` 配下のファイルは以下のルールで管理する。
