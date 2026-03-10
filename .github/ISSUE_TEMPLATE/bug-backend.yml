@@ -1,0 +1,71 @@
+name: "🐛 バグ報告 (バックエンド)"
+description: "バックエンド（API・DB）のバグやエラーを報告する"
+title: "[Bug/BE] "
+labels: ["backend", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        バグの報告ありがとうございます！
+        再現手順とエラーの詳細を書いてもらえると修正しやすくなります 🙏
+
+  - type: input
+    id: summary
+    attributes:
+      label: "🐛 バグの概要"
+      description: "何が起きているか一言で"
+      placeholder: "例: POST /api/users でユーザー登録するとエラーになる"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "🔁 再現手順"
+      description: "どうすれば再現できるか、順を追って教えてください"
+      placeholder: |
+        1. POST /api/users に以下のリクエストを送る
+           { "discordId": "123456", "githubLogin": "username" }
+        2. 500エラーが返ってくる
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "✅ 期待する動作"
+      description: "本来どうなるべきか（期待するレスポンスなど）"
+      placeholder: |
+        201 Created が返り、登録したユーザー情報が返ってくる
+        { "id": "...", "discordId": "123456", ... }
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: "❌ 実際の動作"
+      description: "実際に返ってきたエラーやレスポンスを貼り付けてください"
+      placeholder: |
+        500 Internal Server Error
+        { "error": "..." }
+    validations:
+      required: true
+
+  - type: input
+    id: endpoint
+    attributes:
+      label: "🔗 エンドポイント（任意）"
+      description: "問題が発生しているAPIエンドポイント"
+      placeholder: "例: POST /api/users"
+    validations:
+      required: false
+
+  - type: textarea
+    id: error-response
+    attributes:
+      label: "📋 エラーレスポンス・ログ（任意）"
+      description: "エラーの詳細やCloudflare Workersのログがあれば貼り付けてください"
+      render: "shell"
+    validations:
+      required: false

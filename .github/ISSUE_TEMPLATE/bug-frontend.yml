@@ -1,0 +1,65 @@
+name: "🐛 バグ報告 (フロントエンド)"
+description: "フロントエンド（画面・UI）のバグや表示の問題を報告する"
+title: "[Bug/FE] "
+labels: ["frontend", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        バグの報告ありがとうございます！
+        再現手順を詳しく書いてもらえると修正しやすくなります 🙏
+        スクリーンショットや動画があると特に助かります。
+
+  - type: input
+    id: summary
+    attributes:
+      label: "🐛 バグの概要"
+      description: "何が起きているか一言で"
+      placeholder: "例: ログ一覧ページが真っ白になって何も表示されない"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "🔁 再現手順"
+      description: "どうすれば再現できるか、順を追って教えてください"
+      placeholder: |
+        1. トップページを開く
+        2. 「ログ一覧」をクリック
+        3. ページが真っ白になる
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "✅ 期待する動作"
+      description: "本来どうなるべきか"
+      placeholder: "例: ログの一覧が表示される"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: "❌ 実際の動作"
+      description: "実際に何が起きているか"
+      placeholder: "例: 画面が真っ白のまま。ブラウザのコンソールに「Cannot read properties of undefined」のエラーが出ている"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: "🌐 ブラウザ・OS（任意）"
+      description: "使用しているブラウザとOSを教えてください"
+      placeholder: "例: Chrome 122 / macOS Sonoma"
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        📸 **スクリーンショット・動画**: あれば、このissueに直接貼り付けてください（ドラッグ&ドロップOK）

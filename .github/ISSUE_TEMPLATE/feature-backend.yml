@@ -1,0 +1,52 @@
+name: "✨ 新機能・改善 (バックエンド)"
+description: "バックエンド（API・DB・インフラ）に関する新機能や改善の提案"
+title: "[BE] "
+labels: ["backend", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        バックエンドの新機能・改善提案ありがとうございます！
+        できる範囲で構わないので、なるべく具体的に書いてもらえると実装しやすくなります 🙏
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: "📝 概要"
+      description: "何をしたいか・なぜ必要かを教えてください"
+      placeholder: "例: GET /api/logs にページネーションを追加したい。ログが増えてきたときに全件返すのはパフォーマンス的によくない。"
+    validations:
+      required: true
+
+  - type: input
+    id: endpoint
+    attributes:
+      label: "🔗 関連するエンドポイント（任意）"
+      description: "関係するAPIエンドポイントがあれば記載してください"
+      placeholder: "例: GET /api/logs"
+    validations:
+      required: false
+
+  - type: textarea
+    id: hints
+    attributes:
+      label: "💡 実装のヒント・参考（任意）"
+      description: "関連するファイル、参考になる実装や仕様があれば"
+      placeholder: |
+        - api/src/routes/logs.ts を修正する
+        - limit / offset クエリパラメータを追加する
+        - docs/api.md も更新が必要
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "🔥 優先度"
+      description: "どのくらい急ぎか選んでください"
+      options:
+        - "P0 — 必須（ないと困る）"
+        - "P1 — 重要（あると良い）"
+        - "P2 — あれば嬉しい"
+    validations:
+      required: true
