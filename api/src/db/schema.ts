@@ -1,9 +1,10 @@
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
-  id: text("id").primaryKey(), // nanoid で生成される一意の識別子（Discord ID は discordId フィールドに格納）
-  discordId: text("discord_id").notNull().unique(),
+  id: text("id").primaryKey(),
+  discordId: text("discord_id").unique(), // GitHub OAuthで作成後、Discord OAuth で紐付け
   githubLogin: text("github_login").notNull().unique(),
+  githubAccessToken: text("github_access_token"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date())

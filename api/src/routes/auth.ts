@@ -1,11 +1,21 @@
 import { Hono } from "hono";
-import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import {
+  getCookie,
+  setCookie,
+  deleteCookie,
+  getSignedCookie,
+  setSignedCookie
+} from "hono/cookie";
 import { zValidator } from "@hono/zod-validator";
 import { drizzle } from "drizzle-orm/d1";
 import { eq, lt } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { discordCallbackQuerySchema } from "@seedlog/schema";
-import { oauthCodes } from "../db/schema";
+import {
+  discordCallbackQuerySchema,
+  githubCallbackQuerySchema
+} from "@seedlog/schema";
+import { oauthCodes, users } from "../db/schema";
+import { encryptToken } from "../lib/token-crypto";
 
 const authRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -21,9 +31,13 @@ function generateState(): string {
     .join("");
 }
 
-authRoute.get("/discord", (c) => {
-  const state = generateState();
-  setCookie(c, "discord_oauth_state", state, {
+authRoute.get("/discord", async (c) => {
+  // githubLogin はクライアントから受け取らず、サーバー側の署名済み Cookie から取得
+  const githubLogin =
+    (await getSignedCookie(c, c.env.COOKIE_SECRET, "github_user")) ?? "";
+  const csrf = generateState();
+  const state = btoa(JSON.stringify({ csrf, githubLogin }));
+  setCookie(c, "discord_oauth_state", csrf, {
     httpOnly: true,
     secure: true,
     sameSite: "Lax",
@@ -53,11 +67,24 @@ authRoute.get(
     if (error || !code) return frontendError("oauth_error");
 
     // CSRF: validate state
-    const storedState = getCookie(c, "discord_oauth_state");
+    const storedCsrf = getCookie(c, "discord_oauth_state");
     const returnedState = c.req.query("state");
     deleteCookie(c, "discord_oauth_state", { path: "/" });
 
-    if (!storedState || !returnedState || storedState !== returnedState) {
+    let githubLogin = "";
+    if (returnedState) {
+      try {
+        const decoded = JSON.parse(atob(returnedState)) as {
+          csrf: string;
+          githubLogin: string;
+        };
+        if (!storedCsrf || decoded.csrf !== storedCsrf)
+          return frontendError("state_mismatch");
+        githubLogin = decoded.githubLogin ?? "";
+      } catch {
+        return frontendError("state_mismatch");
+      }
+    } else {
       return frontendError("state_mismatch");
     }
 
@@ -99,6 +126,21 @@ authRoute.get(
     const onetimeCode = nanoid();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5分
 
+    // githubLogin があればユーザーに discordId を紐付け
+    if (githubLogin) {
+      const user = await db
+        .select()
+        .from(users)
+        .where(eq(users.githubLogin, githubLogin))
+        .get();
+      if (user) {
+        await db
+          .update(users)
+          .set({ discordId: discordUser.id })
+          .where(eq(users.id, user.id));
+      }
+    }
+
     // 期限切れコードを掃除してから新規追加
     await db.delete(oauthCodes).where(lt(oauthCodes.expiresAt, new Date()));
     await db.insert(oauthCodes).values({
@@ -118,7 +160,10 @@ authRoute.get(
 authRoute.get("/discord/token", async (c) => {
   const code = c.req.query("code");
   if (!code) {
-    return c.json({ error: { code: "BAD_REQUEST", message: "codeがありません" } }, 400);
+    return c.json(
+      { error: { code: "BAD_REQUEST", message: "codeがありません" } },
+      400
+    );
   }
 
   const db = drizzle(c.env.DB);
@@ -130,17 +175,159 @@ authRoute.get("/discord/token", async (c) => {
     .all();
 
   if (!row) {
-    return c.json({ error: { code: "NOT_FOUND", message: "コードが見つかりません" } }, 404);
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "コードが見つかりません" } },
+      404
+    );
   }
 
   if (row.expiresAt < new Date()) {
     await db.delete(oauthCodes).where(eq(oauthCodes.code, code));
-    return c.json({ error: { code: "GONE", message: "コードの有効期限が切れています" } }, 410);
+    return c.json(
+      { error: { code: "GONE", message: "コードの有効期限が切れています" } },
+      410
+    );
   }
 
   // 単一使用：取得後即削除
   await db.delete(oauthCodes).where(eq(oauthCodes.code, code));
-  return c.json({ discordId: row.discordId, discordUsername: row.discordUsername });
+  return c.json({
+    discordId: row.discordId,
+    discordUsername: row.discordUsername
+  });
 });
+
+// ---- GitHub OAuth ----
+
+const GITHUB_OAUTH_URL = "https://github.com/login/oauth/authorize";
+const GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";
+const GITHUB_USER_URL = "https://api.github.com/user";
+
+authRoute.get("/github", (c) => {
+  const state = generateState();
+  setCookie(c, "github_oauth_state", state, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "Lax",
+    maxAge: 300,
+    path: "/"
+  });
+  const params = new URLSearchParams({
+    client_id: c.env.GITHUB_CLIENT_ID,
+    redirect_uri: c.env.GITHUB_REDIRECT_URI,
+    scope: "admin:repo_hook read:user",
+    state
+  });
+  return c.redirect(`${GITHUB_OAUTH_URL}?${params}`);
+});
+
+authRoute.get(
+  "/github/callback",
+  zValidator("query", githubCallbackQuerySchema),
+  async (c) => {
+    const { code, error, state: returnedState } = c.req.valid("query");
+    const frontendError = (reason: string) =>
+      c.redirect(`${c.env.FRONTEND_URL}/auth/error?reason=${reason}`);
+
+    if (error || !code) return frontendError("oauth_error");
+
+    // CSRF: validate state
+    const storedState = getCookie(c, "github_oauth_state");
+    deleteCookie(c, "github_oauth_state", { path: "/" });
+
+    if (!storedState || !returnedState || storedState !== returnedState) {
+      return frontendError("state_mismatch");
+    }
+
+    const tokenRes = await fetch(GITHUB_TOKEN_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify({
+        client_id: c.env.GITHUB_CLIENT_ID,
+        client_secret: c.env.GITHUB_CLIENT_SECRET,
+        code,
+        redirect_uri: c.env.GITHUB_REDIRECT_URI
+      })
+    });
+
+    if (!tokenRes.ok) {
+      console.error("GitHub token exchange error:", await tokenRes.text());
+      return frontendError("token_exchange");
+    }
+
+    const tokenData = (await tokenRes.json()) as {
+      access_token?: string;
+      error?: string;
+    };
+
+    if (!tokenData.access_token) {
+      console.error("GitHub token exchange failed:", tokenData);
+      return frontendError("token_exchange");
+    }
+
+    const userRes = await fetch(GITHUB_USER_URL, {
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`,
+        "User-Agent": "seedlog-api"
+      }
+    });
+
+    if (!userRes.ok) {
+      console.error("GitHub user fetch error:", await userRes.text());
+      return frontendError("user_fetch");
+    }
+
+    const githubUser = (await userRes.json()) as { login: string };
+
+    const encryptedToken = await encryptToken(
+      tokenData.access_token,
+      c.env.GITHUB_TOKEN_ENCRYPTION_KEY
+    );
+
+    const db = drizzle(c.env.DB);
+    const user = await db
+      .select()
+      .from(users)
+      .where(eq(users.githubLogin, githubUser.login))
+      .get();
+
+    if (user) {
+      // 既存ユーザー → token を更新
+      await db
+        .update(users)
+        .set({ githubAccessToken: encryptedToken })
+        .where(eq(users.id, user.id));
+    } else {
+      // 新規ユーザー → 自動作成
+      await db.insert(users).values({
+        id: nanoid(),
+        githubLogin: githubUser.login,
+        githubAccessToken: encryptedToken
+      });
+    }
+
+    // 署名付き httpOnly Cookie でサーバー側のユーザー識別を保持
+    await setSignedCookie(
+      c,
+      "github_user",
+      githubUser.login,
+      c.env.COOKIE_SECRET,
+      {
+        httpOnly: true,
+        secure: true,
+        sameSite: "None",
+        maxAge: 60 * 60 * 24 * 30,
+        path: "/"
+      }
+    );
+
+    const redirectUrl = new URL(`${c.env.FRONTEND_URL}/auth/github/callback`);
+    redirectUrl.searchParams.set("githubLogin", githubUser.login);
+    return c.redirect(redirectUrl.toString());
+  }
+);
 
 export { authRoute };

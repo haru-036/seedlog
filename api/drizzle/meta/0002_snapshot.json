@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "8f91567e-9501-4f5c-bdbb-28524651801d",
-  "prevId": "2ffcace1-19b4-4558-8749-4ce729a708cd",
+  "id": "20df87a4-bfcf-4b75-b263-b432cc3960f4",
+  "prevId": "8f91567e-9501-4f5c-bdbb-28524651801d",
   "tables": {
     "logs": {
       "name": "logs",
@@ -219,6 +219,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "github_access_token": {
+          "name": "github_access_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "created_at": {

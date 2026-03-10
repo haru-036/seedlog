@@ -3,13 +3,13 @@ import { z } from "zod";
 // ---- Users ----
 
 export const createUserSchema = z.object({
-  discordId: z.string().min(1, "discordIdは必須です"),
+  discordId: z.string().min(1, "discordIdは必須です").optional(),
   githubLogin: z.string().min(1, "githubLoginは必須です")
 });
 
 export const userResponseSchema = z.object({
   id: z.string(),
-  discordId: z.string(),
+  discordId: z.string().nullable(),
   githubLogin: z.string(),
   createdAt: z.string()
 });
@@ -85,6 +85,26 @@ export const discordTokenResponseSchema = z.object({
 });
 
 export type DiscordTokenResponse = z.infer<typeof discordTokenResponseSchema>;
+
+// ---- GitHub OAuth ----
+
+export const githubCallbackQuerySchema = z.object({
+  code: z.string().optional(),
+  error: z.string().optional(),
+  error_description: z.string().optional(),
+  state: z.string().optional()
+});
+
+export type GitHubCallbackQuery = z.infer<typeof githubCallbackQuerySchema>;
+
+export const registerWebhookSchema = z.object({
+  repo: z
+    .string()
+    .min(1, "repoは必須です")
+    .regex(/^[^/]+\/[^/]+$/, "repo は owner/repo 形式で指定してください")
+});
+
+export type RegisterWebhookInput = z.infer<typeof registerWebhookSchema>;
 
 // ---- Logs ----
 

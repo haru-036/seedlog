@@ -16,7 +16,14 @@ logsRoute.get("/", zValidator("query", logsQuerySchema), async (c) => {
   const where = and(...conditions);
 
   const [rows, totalResult] = await Promise.all([
-    db.select().from(logs).where(where).orderBy(logs.createdAt, logs.id).limit(limit).offset(offset).all(),
+    db
+      .select()
+      .from(logs)
+      .where(where)
+      .orderBy(logs.createdAt, logs.id)
+      .limit(limit)
+      .offset(offset)
+      .all(),
     db.select({ total: count() }).from(logs).where(where).get()
   ]);
 

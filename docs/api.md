@@ -4,7 +4,7 @@
 
 `🔒` のついているエンドポイントはリクエストに `userId` が必要（query parameter or request body）。
 
-> **認証について**: MVPでは簡易認証（Discord ID + GitHub usernameの登録のみ）。OAuth認証はP2で対応予定。
+> **認証について**: GitHub OAuth と Discord OAuth で連携・登録。`🔒` のエンドポイントは `userId` が必要。
 
 ---
 
@@ -94,6 +94,107 @@ X-GitHub-Event: push
   ```json
   { "error": { "code": "UNAUTHORIZED", "message": "署名が無効です" } }
   ```
+
+---
+
+## GitHub連携
+
+### `GET /api/auth/github` ✅ 実装済み
+
+GitHub OAuth 認証フローを開始する。
+
+**処理の流れ**
+
+1. CSRF 対策用のランダム state を生成し `github_oauth_state` cookie にセット（httpOnly, Secure, SameSite=Lax, 5分）
+2. GitHub の OAuth 認可画面へリダイレクト（scope: `admin:repo_hook read:user`）
+
+**必要な環境変数**
+
+- `GITHUB_CLIENT_ID`, `GITHUB_REDIRECT_URI`
+
+**レスポンス**
+
+- `302 Redirect` → GitHub 認可画面
+
+---
+
+### `GET /api/auth/github/callback` ✅ 実装済み
+
+GitHub OAuth コールバックを受け取る。
+
+**Query Parameters**
+
+```http
+code?: string
+state?: string
+error?: string
+```
+
+**処理の流れ**
+
+1. CSRF state の検証（`github_oauth_state` Cookie と比較）
+2. GitHub に code でアクセストークンを交換
+3. GitHub ユーザー情報（login）を取得
+4. DB の users テーブルから githubLogin でユーザーを検索し、未登録なら自動作成
+5. `githubAccessToken` を暗号化して DB に保存
+6. 署名付き `github_user` Cookie をセット（30日間有効）
+7. フロントエンドへリダイレクト
+
+**必要な環境変数**
+
+- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_REDIRECT_URI`, `FRONTEND_URL`
+- `GITHUB_TOKEN_ENCRYPTION_KEY`, `COOKIE_SECRET`
+
+**成功レスポンス**
+
+- `302 Redirect` → `${FRONTEND_URL}/auth/github/callback?githubLogin=<login>`
+
+**エラーレスポンス**
+
+- `302 Redirect` → `${FRONTEND_URL}/auth/error?reason=<reason>`
+  - `reason=state_mismatch` — CSRF 検証失敗
+  - `reason=token_exchange` — GitHub のトークン交換失敗
+  - `reason=user_fetch` — GitHub ユーザー情報取得失敗
+
+---
+
+### `POST /api/webhooks/register` ✅ 実装済み
+
+指定リポジトリに GitHub Webhook を自動登録する。
+
+**Request**
+
+```typescript
+{
+  repo: string; // "owner/repo" 形式（認証ユーザーを github_user cookie から解決）
+}
+```
+
+**処理の流れ**
+
+1. `github_user` cookie から認証済みユーザーの GitHub login を解決
+2. DB の users テーブルから githubLogin でユーザーを検索し、暗号化された `githubAccessToken` を取得・復号
+3. GitHub API `POST /repos/{owner}/{repo}/hooks` を呼び出し
+4. Webhook URL: `GITHUB_WEBHOOK_URL`、イベント: `push`、署名: `GITHUB_WEBHOOK_SECRET`
+
+**必要な環境変数**
+
+- `GITHUB_WEBHOOK_URL`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_TOKEN_ENCRYPTION_KEY`
+
+**Response** `201 Created`
+
+```typescript
+{ ok: true; hookId: number }
+```
+
+**Error Responses**
+
+- `401 Unauthorized` — `github_user` cookie が未設定、または GitHub 未連携（githubAccessToken が未設定）
+- `404 Not Found` — ユーザーが見つからない
+- `200 OK` — すでに同じ Webhook が登録済み（`{ ok: true, message: "webhookはすでに登録済みです" }`）
+- `422 Unprocessable Entity` — GitHub API バリデーションエラー（重複以外）
+- `500 Internal Server Error` — `GITHUB_WEBHOOK_SECRET` が未設定
+- `502 Bad Gateway` — GitHub API エラー
 
 ---
 

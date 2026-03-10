@@ -8,7 +8,12 @@ import { users } from "../db/schema";
 
 const usersRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
-function toUserResponse(user: { id: string; discordId: string; githubLogin: string; createdAt: Date }) {
+function toUserResponse(user: {
+  id: string;
+  discordId: string | null;
+  githubLogin: string;
+  createdAt: Date;
+}) {
   return userResponseSchema.parse({
     id: user.id,
     discordId: user.discordId,
@@ -24,12 +29,26 @@ usersRoute.post("/", zValidator("json", createUserSchema), async (c) => {
   const existing = await db
     .select()
     .from(users)
-    .where(or(eq(users.discordId, discordId), eq(users.githubLogin, githubLogin)))
+    .where(
+      discordId
+        ? or(eq(users.discordId, discordId), eq(users.githubLogin, githubLogin))
+        : eq(users.githubLogin, githubLogin)
+    )
     .get();
 
   if (existing) {
-    const field = existing.discordId === discordId ? "discordId" : "githubLogin";
-    return c.json({ error: { code: "CONFLICT", message: `${field}はすでに登録されています` } }, 409);
+    const field =
+      existing.githubLogin === githubLogin
+        ? "githubLogin"
+        : discordId && existing.discordId === discordId
+          ? "discordId"
+          : "githubLogin";
+    return c.json(
+      {
+        error: { code: "CONFLICT", message: `${field}はすでに登録されています` }
+      },
+      409
+    );
   }
 
   const id = nanoid();
@@ -39,14 +58,30 @@ usersRoute.post("/", zValidator("json", createUserSchema), async (c) => {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("UNIQUE")) {
       const field = msg.includes("discord_id") ? "discordId" : "githubLogin";
-      return c.json({ error: { code: "CONFLICT", message: `${field}はすでに登録されています` } }, 409);
+      return c.json(
+        {
+          error: {
+            code: "CONFLICT",
+            message: `${field}はすでに登録されています`
+          }
+        },
+        409
+      );
     }
     throw err;
   }
 
   const user = await db.select().from(users).where(eq(users.id, id)).get();
   if (!user) {
-    return c.json({ error: { code: "INTERNAL_ERROR", message: "ユーザーの作成に失敗しました" } }, 500);
+    return c.json(
+      {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "ユーザーの作成に失敗しました"
+        }
+      },
+      500
+    );
   }
 
   return c.json(toUserResponse(user), 201);
@@ -58,7 +93,10 @@ usersRoute.get("/:id", async (c) => {
 
   const user = await db.select().from(users).where(eq(users.id, id)).get();
   if (!user) {
-    return c.json({ error: { code: "NOT_FOUND", message: "ユーザーが見つかりません" } }, 404);
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "ユーザーが見つかりません" } },
+      404
+    );
   }
 
   return c.json(toUserResponse(user));
