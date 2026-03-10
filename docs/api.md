@@ -12,14 +12,14 @@
 
 ### `POST /api/users` ✅ 実装済み
 
-ユーザーを登録する。Discord ID と GitHub username を紐付ける。
+ユーザーを登録する。GitHub OAuth 経由の自動作成が主な登録経路だが、直接呼び出しも可能。
 
 **Request**
 
 ```typescript
 {
-  discordId: string;  // Discord ユーザーID
-  githubLogin: string; // GitHub ユーザー名
+  discordId?: string;  // Discord ユーザーID（省略可。Discord OAuth 連携後に紐付け）
+  githubLogin: string; // GitHub ユーザー名（必須）
 }
 ```
 
@@ -27,10 +27,10 @@
 
 ```typescript
 {
-  id: string;        // nanoid() で生成される21文字のURL-safeな一意識別子
-  discordId: string;
+  id: string;              // nanoid() で生成される21文字のURL-safeな一意識別子
+  discordId: string | null; // Discord 未連携の場合は null
   githubLogin: string;
-  createdAt: string; // ISO 8601
+  createdAt: string;       // ISO 8601
 }
 ```
 
@@ -51,7 +51,7 @@
 ```typescript
 {
   id: string;
-  discordId: string;
+  discordId: string | null; // Discord 未連携の場合は null
   githubLogin: string;
   createdAt: string; // ISO 8601
 }
@@ -166,7 +166,7 @@ error?: string
 
 ```typescript
 {
-  repo: string; // "owner/repo" 形式（認証ユーザーを github_user cookie から解決）
+  repo: string; // "owner/repo" 形式（認証ユーザーは github_user 署名済み Cookie から解決）
 }
 ```
 
