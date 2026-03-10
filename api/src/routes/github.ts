@@ -44,7 +44,12 @@ githubRoute.post("/github", async (c) => {
     return c.json({ ok: true });
   }
 
-  const parsed = githubPushPayloadSchema.safeParse(JSON.parse(body));
+  let parsed: ReturnType<typeof githubPushPayloadSchema.safeParse>;
+  try {
+    parsed = githubPushPayloadSchema.safeParse(JSON.parse(body));
+  } catch {
+    return c.json({ error: { code: "BAD_REQUEST", message: "不正なpayload形式です" } }, 400);
+  }
   if (!parsed.success) {
     return c.json({ error: { code: "BAD_REQUEST", message: "不正なpayload形式です" } }, 400);
   }
