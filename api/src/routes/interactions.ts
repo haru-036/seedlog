@@ -182,38 +182,36 @@ interactionsRoute.post("/", async (c) => {
 
     const customId = interaction.data?.custom_id ?? "";
 
-    // 質問への回答（重複・誤ユーザー書き込みを防ぐためアトミックに処理）
+    // 質問への回答（answeredAt IS NULL の条件付き UPDATE で重複書き込みを防止）
     if (customId.startsWith("question_reply:")) {
       const questionId = customId.slice("question_reply:".length);
       c.executionCtx.waitUntil(
         (async () => {
           try {
-            await db.transaction(async (tx) => {
-              const updated = await tx
-                .update(questions)
-                .set({ answeredAt: new Date() })
-                .where(
-                  and(
-                    eq(questions.id, questionId),
-                    eq(questions.userId, user.id),
-                    isNull(questions.answeredAt)
-                  )
+            const updated = await db
+              .update(questions)
+              .set({ answeredAt: new Date() })
+              .where(
+                and(
+                  eq(questions.id, questionId),
+                  eq(questions.userId, user.id),
+                  isNull(questions.answeredAt)
                 )
-                .returning({ id: questions.id });
+              )
+              .returning({ id: questions.id });
 
-              if (updated.length === 0) {
-                // 既回答 or 別ユーザーの質問
-                console.warn("question_reply: スキップ（既回答または権限なし）", { questionId, userId: user.id });
-                return;
-              }
+            if (updated.length === 0) {
+              // 既回答 or 別ユーザーの質問
+              console.warn("question_reply: スキップ（既回答または権限なし）", { questionId, userId: user.id });
+              return;
+            }
 
-              await tx.insert(logs).values({
-                id: nanoid(),
-                userId: user.id,
-                questionId,
-                content,
-                source: "discord_reply"
-              });
+            await db.insert(logs).values({
+              id: nanoid(),
+              userId: user.id,
+              questionId,
+              content,
+              source: "discord_reply"
             });
           } catch (err) {
             console.error("question_reply: ログ保存エラー", err);
