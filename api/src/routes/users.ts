@@ -24,7 +24,16 @@ usersRoute.post("/", zValidator("json", createUserSchema), async (c) => {
   }
 
   const id = nanoid();
-  await db.insert(users).values({ id, discordId, githubLogin });
+  try {
+    await db.insert(users).values({ id, discordId, githubLogin });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("UNIQUE")) {
+      const field = msg.includes("discord_id") ? "discordId" : "githubLogin";
+      return c.json({ error: { code: "CONFLICT", message: `${field}はすでに登録されています` } }, 409);
+    }
+    throw err;
+  }
 
   const user = await db.select().from(users).where(eq(users.id, id)).get();
   if (!user) {
