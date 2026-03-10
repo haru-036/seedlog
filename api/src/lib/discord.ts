@@ -24,10 +24,15 @@ export async function createDMChannel(botToken: string, discordUserId: string): 
   return data.id as string;
 }
 
-export async function sendDMMessage(botToken: string, channelId: string, content: string): Promise<string> {
+export async function sendDMMessage(
+  botToken: string,
+  channelId: string,
+  content: string,
+  options?: { components?: unknown[] }
+): Promise<string> {
   const data = await discordFetch(botToken, `/channels/${channelId}/messages`, {
     method: "POST",
-    body: JSON.stringify({ content })
+    body: JSON.stringify({ content, ...options })
   });
   return data.id as string;
 }

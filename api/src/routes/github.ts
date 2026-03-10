@@ -94,7 +94,21 @@ githubRoute.post("/github", async (c) => {
     let messageId: string;
     try {
       const channelId = await createDMChannel(c.env.DISCORD_BOT_TOKEN, user.discordId);
-      messageId = await sendDMMessage(c.env.DISCORD_BOT_TOKEN, channelId, questionText);
+      messageId = await sendDMMessage(c.env.DISCORD_BOT_TOKEN, channelId, questionText, {
+        components: [
+          {
+            type: 1, // ACTION_ROW
+            components: [
+              {
+                type: 2, // BUTTON
+                style: 1, // PRIMARY
+                label: "回答する",
+                custom_id: `open_reply_modal:${questionId}`
+              }
+            ]
+          }
+        ]
+      });
     } catch (err) {
       console.error("Discord DM 送信エラー:", err);
       return;

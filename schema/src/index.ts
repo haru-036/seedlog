@@ -43,3 +43,29 @@ export const githubPushPayloadSchema = z.object({
 });
 
 export type GitHubPushPayload = z.infer<typeof githubPushPayloadSchema>;
+
+// ---- Discord Interactions ----
+
+export const discordInteractionSchema = z.object({
+  type: z.number().int(),
+  data: z
+    .object({
+      custom_id: z.string().optional(),
+      name: z.string().optional(),
+      components: z
+        .array(
+          z.object({
+            type: z.number(),
+            components: z
+              .array(z.object({ type: z.number(), custom_id: z.string(), value: z.string().optional() }))
+              .optional()
+          })
+        )
+        .optional()
+    })
+    .optional(),
+  member: z.object({ user: z.object({ id: z.string() }) }).optional(),
+  user: z.object({ id: z.string() }).optional()
+});
+
+export type DiscordInteraction = z.infer<typeof discordInteractionSchema>;
