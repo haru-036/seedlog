@@ -2,11 +2,20 @@ import { zValidator } from "@hono/zod-validator";
 import { eq, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { nanoid } from "nanoid";
-import { createUserSchema } from "@seedlog/schema";
+import { createUserSchema, userResponseSchema } from "@seedlog/schema";
 import { createDb } from "../db";
 import { users } from "../db/schema";
 
 const usersRoute = new Hono<{ Bindings: CloudflareBindings }>();
+
+function toUserResponse(user: { id: string; discordId: string; githubLogin: string; createdAt: Date }) {
+  return userResponseSchema.parse({
+    id: user.id,
+    discordId: user.discordId,
+    githubLogin: user.githubLogin,
+    createdAt: user.createdAt.toISOString()
+  });
+}
 
 usersRoute.post("/", zValidator("json", createUserSchema), async (c) => {
   const { discordId, githubLogin } = c.req.valid("json");
@@ -40,15 +49,7 @@ usersRoute.post("/", zValidator("json", createUserSchema), async (c) => {
     return c.json({ error: { code: "INTERNAL_ERROR", message: "ユーザーの作成に失敗しました" } }, 500);
   }
 
-  return c.json(
-    {
-      id: user.id,
-      discordId: user.discordId,
-      githubLogin: user.githubLogin,
-      createdAt: user.createdAt.toISOString()
-    },
-    201
-  );
+  return c.json(toUserResponse(user), 201);
 });
 
 usersRoute.get("/:id", async (c) => {
@@ -60,12 +61,7 @@ usersRoute.get("/:id", async (c) => {
     return c.json({ error: { code: "NOT_FOUND", message: "ユーザーが見つかりません" } }, 404);
   }
 
-  return c.json({
-    id: user.id,
-    discordId: user.discordId,
-    githubLogin: user.githubLogin,
-    createdAt: user.createdAt.toISOString()
-  });
+  return c.json(toUserResponse(user));
 });
 
 export { usersRoute };
