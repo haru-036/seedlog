@@ -10,7 +10,7 @@
 
 ## ユーザー
 
-### `POST /api/users`
+### `POST /api/users` ✅ 実装済み
 
 ユーザーを登録する。Discord ID と GitHub username を紐付ける。
 
@@ -18,36 +18,51 @@
 
 ```typescript
 {
-  discordId: string;
-  githubLogin: string;
+  discordId: string;  // Discord ユーザーID
+  githubLogin: string; // GitHub ユーザー名
 }
 ```
 
-**Response**
+**Response** `201 Created`
 
 ```typescript
 {
-  id: string;
+  id: string;        // nanoid() で生成される21文字のURL-safeな一意識別子
   discordId: string;
   githubLogin: string;
-  createdAt: string;
+  createdAt: string; // ISO 8601
 }
 ```
 
-### `GET /api/users/:id`
+**Error Responses**
+
+- `409 Conflict` — discordId または githubLogin がすでに登録済み
+  ```json
+  { "error": { "code": "CONFLICT", "message": "discordIdはすでに登録されています" } }
+  ```
+- `400 Bad Request` — バリデーションエラー
+
+### `GET /api/users/:id` ✅ 実装済み
 
 ユーザー情報を取得。
 
-**Response**
+**Response** `200 OK`
 
 ```typescript
 {
   id: string;
   discordId: string;
   githubLogin: string;
-  createdAt: string;
+  createdAt: string; // ISO 8601
 }
 ```
+
+**Error Responses**
+
+- `404 Not Found`
+  ```json
+  { "error": { "code": "NOT_FOUND", "message": "ユーザーが見つかりません" } }
+  ```
 
 ---
 
