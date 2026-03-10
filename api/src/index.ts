@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "./db";
+import { authRoute } from "./routes/auth";
 import { githubRoute } from "./routes/github";
 import { interactionsRoute } from "./routes/interactions";
 import { logsRoute } from "./routes/logs";
@@ -18,6 +19,7 @@ app.get("/health", async (c) => {
   return c.json({ status: "ok" });
 });
 
+app.route("/api/auth", authRoute);
 app.route("/api/users", usersRoute);
 app.route("/api/webhooks", githubRoute);
 app.route("/api/interactions", interactionsRoute);

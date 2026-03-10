@@ -28,6 +28,13 @@ export const questions = sqliteTable("questions", {
     .$defaultFn(() => new Date())
 });
 
+export const oauthCodes = sqliteTable("oauth_codes", {
+  code: text("code").primaryKey(),
+  discordId: text("discord_id").notNull(),
+  discordUsername: text("discord_username").notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull()
+});
+
 export const logs = sqliteTable("logs", {
   id: text("id").primaryKey(),
   userId: text("user_id")

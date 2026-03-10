@@ -70,6 +70,22 @@ export const discordInteractionSchema = z.object({
 
 export type DiscordInteraction = z.infer<typeof discordInteractionSchema>;
 
+// ---- Discord OAuth ----
+
+export const discordCallbackQuerySchema = z.object({
+  code: z.string().optional(),
+  error: z.string().optional()
+});
+
+export type DiscordCallbackQuery = z.infer<typeof discordCallbackQuerySchema>;
+
+export const discordTokenResponseSchema = z.object({
+  discordId: z.string(),
+  discordUsername: z.string()
+});
+
+export type DiscordTokenResponse = z.infer<typeof discordTokenResponseSchema>;
+
 // ---- Logs ----
 
 export const logSourceSchema = z.enum(["github_push", "discord_reply", "discord_command", "web"]);
