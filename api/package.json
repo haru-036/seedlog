@@ -20,7 +20,8 @@
     "@hono/zod-validator": "^0.7.6",
     "@seedlog/schema": "workspace:*",
     "drizzle-orm": "^0.45.1",
-    "hono": "^4.12.6"
+    "hono": "^4.12.6",
+    "nanoid": "^5.1.6"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260310.1",

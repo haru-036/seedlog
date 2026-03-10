@@ -1,14 +1,18 @@
 import { z } from "zod";
 
-// Example: seed log entry schema
-export const seedLogSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string().min(1),
-  plantedAt: z.string().datetime(),
-  notes: z.string().optional()
+// ---- Users ----
+
+export const createUserSchema = z.object({
+  discordId: z.string().min(1, "discordIdは必須です"),
+  githubLogin: z.string().min(1, "githubLoginは必須です")
 });
 
-export const createSeedLogSchema = seedLogSchema.omit({ id: true });
+export const userResponseSchema = z.object({
+  id: z.string(),
+  discordId: z.string(),
+  githubLogin: z.string(),
+  createdAt: z.string()
+});
 
-export type SeedLog = z.infer<typeof seedLogSchema>;
-export type CreateSeedLog = z.infer<typeof createSeedLogSchema>;
+export type CreateUserInput = z.infer<typeof createUserSchema>;
+export type UserResponse = z.infer<typeof userResponseSchema>;
