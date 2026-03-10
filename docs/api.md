@@ -148,12 +148,12 @@ offset?: number
 {
   logs: {
     id: string;
+    userId: string;
+    questionId: string | null;
     content: string;
     source: "github_push" | "discord_reply" | "discord_command" | "web";
-    questionId: string | null; // 紐づくquestionのID（手動追加の場合はnull）
-    createdAt: string;
-  }
-  [];
+    createdAt: string; // ISO 8601
+  }[];
   total: number;
   hasMore: boolean;
 }

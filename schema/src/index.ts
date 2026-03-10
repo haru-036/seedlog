@@ -92,3 +92,11 @@ export const logsQuerySchema = z.object({
 
 export type LogResponse = z.infer<typeof logResponseSchema>;
 export type LogsQuery = z.infer<typeof logsQuerySchema>;
+
+export const logsListResponseSchema = z.object({
+  logs: z.array(logResponseSchema),
+  total: z.coerce.number().int().min(0),
+  hasMore: z.boolean()
+});
+
+export type LogsListResponse = z.infer<typeof logsListResponseSchema>;
