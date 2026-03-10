@@ -129,7 +129,7 @@ X-Signature-Timestamp: <timestamp>
 
 ## ログ
 
-### `GET /api/logs` 🔒
+### `GET /api/logs` ✅ 実装済み 🔒
 
 ログ一覧を取得。
 

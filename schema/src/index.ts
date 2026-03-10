@@ -69,3 +69,26 @@ export const discordInteractionSchema = z.object({
 });
 
 export type DiscordInteraction = z.infer<typeof discordInteractionSchema>;
+
+// ---- Logs ----
+
+export const logSourceSchema = z.enum(["github_push", "discord_reply", "discord_command", "web"]);
+
+export const logResponseSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  questionId: z.string().nullable(),
+  content: z.string(),
+  source: logSourceSchema,
+  createdAt: z.string()
+});
+
+export const logsQuerySchema = z.object({
+  userId: z.string().min(1, "userIdは必須です"),
+  source: logSourceSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0)
+});
+
+export type LogResponse = z.infer<typeof logResponseSchema>;
+export type LogsQuery = z.infer<typeof logsQuerySchema>;

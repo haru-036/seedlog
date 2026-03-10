@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { createDb } from "./db";
 import { githubRoute } from "./routes/github";
 import { interactionsRoute } from "./routes/interactions";
+import { logsRoute } from "./routes/logs";
 import { usersRoute } from "./routes/users";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
@@ -20,5 +21,6 @@ app.get("/health", async (c) => {
 app.route("/api/users", usersRoute);
 app.route("/api/webhooks", githubRoute);
 app.route("/api/interactions", interactionsRoute);
+app.route("/api/logs", logsRoute);
 
 export default app;
