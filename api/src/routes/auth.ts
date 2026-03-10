@@ -1,5 +1,11 @@
 import { Hono } from "hono";
-import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import {
+  getCookie,
+  setCookie,
+  deleteCookie,
+  getSignedCookie,
+  setSignedCookie
+} from "hono/cookie";
 import { zValidator } from "@hono/zod-validator";
 import { drizzle } from "drizzle-orm/d1";
 import { eq, lt } from "drizzle-orm";
@@ -25,10 +31,11 @@ function generateState(): string {
     .join("");
 }
 
-authRoute.get("/discord", (c) => {
-  const githubLogin = c.req.query("githubLogin") ?? "";
+authRoute.get("/discord", async (c) => {
+  // githubLogin はクライアントから受け取らず、サーバー側の署名済み Cookie から取得
+  const githubLogin =
+    (await getSignedCookie(c, c.env.COOKIE_SECRET, "github_user")) ?? "";
   const csrf = generateState();
-  // state に CSRF + githubLogin を JSON エンコードして埋め込む
   const state = btoa(JSON.stringify({ csrf, githubLogin }));
   setCookie(c, "discord_oauth_state", csrf, {
     httpOnly: true,
@@ -67,8 +74,12 @@ authRoute.get(
     let githubLogin = "";
     if (returnedState) {
       try {
-        const decoded = JSON.parse(atob(returnedState)) as { csrf: string; githubLogin: string };
-        if (!storedCsrf || decoded.csrf !== storedCsrf) return frontendError("state_mismatch");
+        const decoded = JSON.parse(atob(returnedState)) as {
+          csrf: string;
+          githubLogin: string;
+        };
+        if (!storedCsrf || decoded.csrf !== storedCsrf)
+          return frontendError("state_mismatch");
         githubLogin = decoded.githubLogin ?? "";
       } catch {
         return frontendError("state_mismatch");
@@ -271,7 +282,10 @@ authRoute.get(
 
     const githubUser = (await userRes.json()) as { login: string };
 
-    const encryptedToken = await encryptToken(tokenData.access_token, c.env.GITHUB_TOKEN_ENCRYPTION_KEY);
+    const encryptedToken = await encryptToken(
+      tokenData.access_token,
+      c.env.GITHUB_TOKEN_ENCRYPTION_KEY
+    );
 
     const db = drizzle(c.env.DB);
     const user = await db
@@ -295,15 +309,20 @@ authRoute.get(
       });
     }
 
-    // Set an httpOnly cookie so the server can identify the authenticated GitHub user
-    // without trusting client-supplied values in subsequent API calls.
-    setCookie(c, "github_user", githubUser.login, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "None",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: "/"
-    });
+    // 署名付き httpOnly Cookie でサーバー側のユーザー識別を保持
+    await setSignedCookie(
+      c,
+      "github_user",
+      githubUser.login,
+      c.env.COOKIE_SECRET,
+      {
+        httpOnly: true,
+        secure: true,
+        sameSite: "None",
+        maxAge: 60 * 60 * 24 * 30,
+        path: "/"
+      }
+    );
 
     const redirectUrl = new URL(`${c.env.FRONTEND_URL}/auth/github/callback`);
     redirectUrl.searchParams.set("githubLogin", githubUser.login);

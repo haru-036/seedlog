@@ -4,7 +4,7 @@
 
 `🔒` のついているエンドポイントはリクエストに `userId` が必要（query parameter or request body）。
 
-> **認証について**: MVPでは簡易認証（Discord ID + GitHub usernameの登録のみ）。OAuth認証はP2で対応予定。
+> **認証について**: GitHub OAuth と Discord OAuth で連携・登録。`🔒` のエンドポイントは `userId` が必要。
 
 ---
 
@@ -124,23 +124,26 @@ GitHub OAuth コールバックを受け取る。
 
 **Query Parameters**
 
-```
+```http
 code?: string
+state?: string
 error?: string
 ```
 
 **処理の流れ**
 
-1. CSRF state の検証
+1. CSRF state の検証（`github_oauth_state` Cookie と比較）
 2. GitHub に code でアクセストークンを交換
 3. GitHub ユーザー情報（login）を取得
-4. DB の users テーブルから githubLogin でユーザーを検索
-5. `githubAccessToken` を DB に保存
-6. フロントエンドへリダイレクト
+4. DB の users テーブルから githubLogin でユーザーを検索し、未登録なら自動作成
+5. `githubAccessToken` を暗号化して DB に保存
+6. 署名付き `github_user` Cookie をセット（30日間有効）
+7. フロントエンドへリダイレクト
 
 **必要な環境変数**
 
 - `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_REDIRECT_URI`, `FRONTEND_URL`
+- `GITHUB_TOKEN_ENCRYPTION_KEY`, `COOKIE_SECRET`
 
 **成功レスポンス**
 
@@ -152,7 +155,6 @@ error?: string
   - `reason=state_mismatch` — CSRF 検証失敗
   - `reason=token_exchange` — GitHub のトークン交換失敗
   - `reason=user_fetch` — GitHub ユーザー情報取得失敗
-  - `reason=user_not_found` — seedlog に未登録のユーザー
 
 ---
 

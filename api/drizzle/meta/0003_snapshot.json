@@ -57,12 +57,8 @@
           "name": "logs_user_id_users_id_fk",
           "tableFrom": "logs",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -70,12 +66,8 @@
           "name": "logs_question_id_questions_id_fk",
           "tableFrom": "logs",
           "tableTo": "questions",
-          "columnsFrom": [
-            "question_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["question_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -195,12 +187,8 @@
           "name": "questions_user_id_users_id_fk",
           "tableFrom": "questions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -251,16 +239,12 @@
       "indexes": {
         "users_discord_id_unique": {
           "name": "users_discord_id_unique",
-          "columns": [
-            "discord_id"
-          ],
+          "columns": ["discord_id"],
           "isUnique": true
         },
         "users_github_login_unique": {
           "name": "users_github_login_unique",
-          "columns": [
-            "github_login"
-          ],
+          "columns": ["github_login"],
           "isUnique": true
         }
       },

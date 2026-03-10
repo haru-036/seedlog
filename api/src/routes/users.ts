@@ -38,7 +38,11 @@ usersRoute.post("/", zValidator("json", createUserSchema), async (c) => {
 
   if (existing) {
     const field =
-      existing.discordId === discordId ? "discordId" : "githubLogin";
+      existing.githubLogin === githubLogin
+        ? "githubLogin"
+        : discordId && existing.discordId === discordId
+          ? "discordId"
+          : "githubLogin";
     return c.json(
       {
         error: { code: "CONFLICT", message: `${field}はすでに登録されています` }

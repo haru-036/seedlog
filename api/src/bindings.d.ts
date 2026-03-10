@@ -12,4 +12,6 @@ declare interface CloudflareBindings {
   GITHUB_WEBHOOK_SECRET: string;
   // 256-bit key as 64 hex characters, used for AES-GCM encryption of GitHub access tokens
   GITHUB_TOKEN_ENCRYPTION_KEY: string;
+  // HMAC-SHA256 signing secret for httpOnly cookies (arbitrary string, min 32 chars)
+  COOKIE_SECRET: string;
 }

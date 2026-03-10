@@ -6,7 +6,7 @@ const QUESTION_PROMPT = (files: string[]) =>
 GitHubのpushで変更されたファイル一覧をもとに、エンジニアに投げかける振り返り質問を1つ生成してください。
 
 ## 変更ファイル
-${files.join("\n")}
+${JSON.stringify(files)}
 
 ## ルール
 - 質問は日本語で、1文以内
@@ -17,14 +17,21 @@ ${files.join("\n")}
 質問文のみを出力してください（前置きや説明は不要）。
 `.trim();
 
+const FALLBACK_QUESTION = "今日のコードで一番詰まったところはどこでしたか？";
+
 export async function generateQuestion(
   apiKey: string,
   changedFiles: string[]
 ): Promise<string> {
   const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: QUESTION_PROMPT(changedFiles)
-  });
-  return response.text ?? "今日のコードで一番詰まったところはどこでしたか？";
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: QUESTION_PROMPT(changedFiles)
+    });
+    return response.text ?? FALLBACK_QUESTION;
+  } catch (err) {
+    console.error("Gemini API error:", err);
+    return FALLBACK_QUESTION;
+  }
 }
