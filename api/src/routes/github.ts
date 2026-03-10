@@ -91,12 +91,19 @@ githubRoute.post("/github", async (c) => {
   });
 
   const sendDM = async () => {
+    let messageId: string;
     try {
       const channelId = await createDMChannel(c.env.DISCORD_BOT_TOKEN, user.discordId);
-      const messageId = await sendDMMessage(c.env.DISCORD_BOT_TOKEN, channelId, questionText);
-      await db.update(questions).set({ discordMessageId: messageId }).where(eq(questions.id, questionId));
+      messageId = await sendDMMessage(c.env.DISCORD_BOT_TOKEN, channelId, questionText);
     } catch (err) {
       console.error("Discord DM 送信エラー:", err);
+      return;
+    }
+
+    try {
+      await db.update(questions).set({ discordMessageId: messageId }).where(eq(questions.id, questionId));
+    } catch (err) {
+      console.error("Discord DM sent but failed to save discordMessageId:", { err, messageId, questionId });
     }
   };
   c.executionCtx.waitUntil(sendDM());
