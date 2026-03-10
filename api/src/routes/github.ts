@@ -8,17 +8,26 @@ import { questions, users } from "../db/schema";
 const githubRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
 async function verifySignature(secret: string, body: string, signature: string): Promise<boolean> {
+  if (!signature.startsWith("sha256=")) return false;
+  const hex = signature.slice(7);
+  if (hex.length % 2 !== 0) return false;
+
+  let signatureBytes: Uint8Array;
+  try {
+    signatureBytes = new Uint8Array(hex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+  } catch {
+    return false;
+  }
+
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
     encoder.encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
-    ["sign"]
+    ["verify"]
   );
-  const mac = await crypto.subtle.sign("HMAC", key, encoder.encode(body));
-  const expected = "sha256=" + Array.from(new Uint8Array(mac)).map((b) => b.toString(16).padStart(2, "0")).join("");
-  return expected === signature;
+  return crypto.subtle.verify("HMAC", key, signatureBytes, encoder.encode(body));
 }
 
 githubRoute.post("/github", async (c) => {
