@@ -217,3 +217,4 @@ offset?: number
   episode: string; // AIが生成した要約テキスト
 }
 ```
+
