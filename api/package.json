@@ -17,6 +17,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@google/genai": "^1.44.0",
     "@hono/zod-validator": "^0.7.6",
     "@seedlog/schema": "workspace:*",
     "drizzle-orm": "^0.45.1",
