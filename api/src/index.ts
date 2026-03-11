@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createDb } from "./db";
+import { AppError } from "./lib/errors";
 import { authRoute } from "./routes/auth";
 import { episodesRoute } from "./routes/episodes";
 import { githubRoute } from "./routes/github";
@@ -31,6 +32,20 @@ app.get("/health", async (c) => {
   const db = createDb(c.env.DB);
   await db.run(sql`SELECT 1`);
   return c.json({ status: "ok" });
+});
+
+app.onError((err, c) => {
+  if (err instanceof AppError) {
+    return c.json(
+      { error: { code: err.code, message: err.message } },
+      err.status as Parameters<typeof c.json>[1]
+    );
+  }
+  console.error("Unexpected error:", err);
+  return c.json(
+    { error: { code: "INTERNAL_ERROR", message: "内部エラーが発生しました" } },
+    500
+  );
 });
 
 app.route("/api/auth", authRoute);
