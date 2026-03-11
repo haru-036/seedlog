@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import useSWR from "swr";
 import type { DiscordTokenResponse } from "@seedlog/schema";
 import { apiFetch } from "../lib/api";
@@ -19,22 +20,21 @@ export default function DiscordCallbackPage() {
     ([, c]) => exchangeCode(c)
   );
 
-  if (!code) {
-    window.location.replace("/auth/error?reason=oauth_error");
-    return null;
-  }
-
-  if (error) {
-    window.location.replace("/auth/error?reason=discord_link_failed");
-    return null;
-  }
-
-  if (data) {
-    localStorage.setItem("discordId", data.discordId);
-    localStorage.setItem("discordUsername", data.discordUsername);
-    window.location.replace("/repos");
-    return null;
-  }
+  useEffect(() => {
+    if (!code) {
+      window.location.replace("/auth/error?reason=oauth_error");
+      return;
+    }
+    if (error) {
+      window.location.replace("/auth/error?reason=discord_link_failed");
+      return;
+    }
+    if (data) {
+      localStorage.setItem("discordId", data.discordId);
+      localStorage.setItem("discordUsername", data.discordUsername);
+      window.location.replace("/repos");
+    }
+  }, [code, error, data]);
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
