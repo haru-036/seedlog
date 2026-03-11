@@ -1,17 +1,14 @@
 import useSWR from "swr";
 import type { DiscordTokenResponse } from "@seedlog/schema";
-import { API_BASE } from "../lib/api";
+import { apiFetch } from "../lib/api";
 
-function exchangeCode(code: string): Promise<DiscordTokenResponse> {
-  return fetch(`${API_BASE}/api/auth/discord/token`, {
+async function exchangeCode(code: string): Promise<DiscordTokenResponse> {
+  const res = await apiFetch("/api/auth/discord/token", {
     method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ code })
-  }).then(async (res) => {
-    if (!res.ok) throw new Error("discord_link_failed");
-    return res.json() as Promise<DiscordTokenResponse>;
   });
+  if (!res.ok) throw new Error("discord_link_failed");
+  return res.json() as Promise<DiscordTokenResponse>;
 }
 
 export default function DiscordCallbackPage() {
