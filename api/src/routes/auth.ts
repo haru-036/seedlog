@@ -157,8 +157,11 @@ authRoute.get(
 );
 
 // フロントが one-time code を Discord ユーザーデータと交換するエンドポイント
-authRoute.get("/discord/token", async (c) => {
-  const code = c.req.query("code");
+authRoute.post("/discord/token", async (c) => {
+  const body = await c.req
+    .json<{ code?: string }>()
+    .catch(() => ({ code: undefined }));
+  const code = body.code;
   if (!code) {
     return c.json(
       { error: { code: "BAD_REQUEST", message: "codeがありません" } },
