@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import type { Repo, ReposResponse } from "@seedlog/schema";
 import { apiFetch, API_BASE, fetcher } from "../lib/api";
@@ -26,7 +26,8 @@ function RepoItem({ repo }: { repo: Repo }) {
         return;
       }
       setStatus(data.message?.includes("すでに") ? "exists" : "done");
-    } catch {
+    } catch (err) {
+      console.error("Webhook 登録に失敗しました:", err);
       setStatus("error");
     }
   }
@@ -74,7 +75,11 @@ function RepoItem({ repo }: { repo: Repo }) {
 }
 
 export default function ReposPage() {
-  const githubLogin = localStorage.getItem("githubLogin");
+  const [githubLogin, setGithubLogin] = useState<string | null>(null);
+
+  useEffect(() => {
+    setGithubLogin(localStorage.getItem("githubLogin"));
+  }, []);
   const { data, error, isLoading } = useSWR<ReposResponse>(
     "/api/repos",
     fetcher

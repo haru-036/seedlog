@@ -6,8 +6,10 @@ export default function GitHubCallbackPage() {
     const githubLogin = params.get("githubLogin");
     if (githubLogin) {
       localStorage.setItem("githubLogin", githubLogin);
+      window.location.replace("/repos");
+    } else {
+      window.location.replace("/auth/error?reason=oauth_error");
     }
-    window.location.replace("/repos");
   }, []);
 
   return (

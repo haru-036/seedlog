@@ -91,10 +91,24 @@ reposRoute.get("/", async (c) => {
     );
   }
 
-  const accessToken = await decryptToken(
-    user.githubAccessToken,
-    c.env.GITHUB_TOKEN_ENCRYPTION_KEY
-  );
+  let accessToken: string;
+  try {
+    accessToken = await decryptToken(
+      user.githubAccessToken,
+      c.env.GITHUB_TOKEN_ENCRYPTION_KEY
+    );
+  } catch {
+    return c.json(
+      {
+        error: {
+          code: "UNAUTHORIZED",
+          message:
+            "アクセストークンの復号に失敗しました。再度GitHubログインしてください。"
+        }
+      },
+      401
+    );
+  }
 
   let repos: Repo[];
   try {
