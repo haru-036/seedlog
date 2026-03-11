@@ -50,9 +50,23 @@ export type Example = z.infer<typeof exampleSchema>;
 - `wrangler.jsonc` で Workers の設定を管理
 
 ```sh
-bun run dev      # wrangler dev でローカル起動
-bun run deploy   # wrangler deploy で本番デプロイ
+bun run dev         # wrangler dev でローカル起動
+bun run cf-typegen  # CloudflareBindings 型を自動生成（シークレット追加後に必ず実行）
+bun run deploy      # wrangler deploy で本番デプロイ
 ```
+
+#### シークレット・バインディングの追加手順
+
+**必ずこの順番で行うこと:**
+
+1. `api/.dev.vars` にローカル用の値を追加する
+2. `cd api && bun run cf-typegen` を実行して `CloudflareBindings` 型を自動生成する
+3. `wrangler.jsonc` にバインディング（KV・D1 等）を追記する（シークレットは不要）
+4. 本番環境には `wrangler secret put <KEY>` または Cloudflare ダッシュボードで設定する
+
+**やってはいけないこと:**
+
+- `bindings.d.ts` を手動で作成・編集する → `cf-typegen` で自動生成されるため不要
 
 ### web/ (Vite + React + Tailwind CSS → Cloudflare Workers Static Assets)
 
@@ -82,6 +96,7 @@ bun run deploy   # ビルド → wrangler deploy
 - **`any` は使わない** — strict モードを維持する
 - **新しいパッケージマネージャーは使わない** — Bun のみ（`npm` / `yarn` / `pnpm` 禁止）
 - **フロントのフレームワーク追加時は Vite プラグイン経由** — `@tailwindcss/vite` のように
+- **実装後はルートで `bun run check` を実行する** — フォーマット（oxfmt）+ リント（oxlint）を必ず確認する
 
 ## git・gh コマンドの実行ルール
 

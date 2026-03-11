@@ -1,12 +1,24 @@
 import { useEffect, useState } from "react";
-import useSWR from "swr";
-import type { Repo, ReposResponse } from "@seedlog/schema";
+import useSWR, { mutate } from "swr";
+import type {
+  Repo,
+  ReposResponse,
+  WebhooksListResponse
+} from "@seedlog/schema";
 import { apiFetch, API_BASE, fetcher } from "../lib/api";
 
 type WebhookStatus = "idle" | "loading" | "done" | "exists" | "error";
 
-function RepoItem({ repo }: { repo: Repo }) {
-  const [status, setStatus] = useState<WebhookStatus>("idle");
+function RepoItem({
+  repo,
+  isRegistered
+}: {
+  repo: Repo;
+  isRegistered: boolean;
+}) {
+  const [status, setStatus] = useState<WebhookStatus>(
+    isRegistered ? "done" : "idle"
+  );
 
   async function registerWebhook() {
     setStatus("loading");
@@ -25,7 +37,9 @@ function RepoItem({ repo }: { repo: Repo }) {
         setStatus("error");
         return;
       }
-      setStatus(data.message?.includes("すでに") ? "exists" : "done");
+      const newStatus = data.message?.includes("すでに") ? "exists" : "done";
+      setStatus(newStatus);
+      await mutate("/api/webhooks");
     } catch (err) {
       console.error("Webhook 登録に失敗しました:", err);
       setStatus("error");
@@ -76,15 +90,23 @@ function RepoItem({ repo }: { repo: Repo }) {
 
 export default function ReposPage() {
   const [githubLogin, setGithubLogin] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     setGithubLogin(localStorage.getItem("githubLogin"));
   }, []);
+
   const { data, error, isLoading } = useSWR<ReposResponse>(
-    "/api/repos",
+    `/api/repos?page=${page}&per_page=20`,
     fetcher
   );
+  const { data: webhooksData } = useSWR<WebhooksListResponse>(
+    "/api/webhooks",
+    fetcher
+  );
+
   const repos = data?.repos ?? [];
+  const registeredSet = new Set(webhooksData?.repos ?? []);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -123,10 +145,37 @@ export default function ReposPage() {
         )}
 
         <div className="space-y-2">
-          {repos.map((repo) => (
-            <RepoItem key={repo.fullName} repo={repo} />
-          ))}
+          {repos.map((repo) => {
+            const isRegistered = registeredSet.has(repo.fullName);
+            return (
+              <RepoItem
+                key={`${repo.fullName}-${String(isRegistered)}`}
+                repo={repo}
+                isRegistered={isRegistered}
+              />
+            );
+          })}
         </div>
+
+        {!isLoading && !error && (
+          <div className="flex items-center justify-between pt-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="text-sm px-3 py-1.5 rounded bg-gray-800 text-gray-300 disabled:opacity-40 hover:bg-gray-700 transition-colors"
+            >
+              ← 前へ
+            </button>
+            <span className="text-sm text-gray-500">{page} ページ</span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={!data?.hasNextPage}
+              className="text-sm px-3 py-1.5 rounded bg-gray-800 text-gray-300 disabled:opacity-40 hover:bg-gray-700 transition-colors"
+            >
+              次へ →
+            </button>
+          </div>
+        )}
       </main>
     </div>
   );

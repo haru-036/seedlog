@@ -11,5 +11,11 @@
       "database_id": "b0a550b2-268a-4476-987b-ad2119f33512",
       "migrations_dir": "drizzle"
     }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "WEBHOOK_KV",
+      "id": "95ec8c25fcbd45d58c6019a24090701a"
+    }
   ]
 }

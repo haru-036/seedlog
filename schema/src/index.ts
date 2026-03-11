@@ -172,9 +172,21 @@ export const repoSchema = z.object({
   updatedAt: z.string()
 });
 
+export const reposQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  per_page: z.coerce.number().int().min(1).max(100).default(20)
+});
+
 export const reposResponseSchema = z.object({
-  repos: z.array(repoSchema)
+  repos: z.array(repoSchema),
+  hasNextPage: z.boolean()
+});
+
+export const webhooksListResponseSchema = z.object({
+  repos: z.array(z.string())
 });
 
 export type Repo = z.infer<typeof repoSchema>;
 export type ReposResponse = z.infer<typeof reposResponseSchema>;
+export type ReposQuery = z.infer<typeof reposQuerySchema>;
+export type WebhooksListResponse = z.infer<typeof webhooksListResponseSchema>;

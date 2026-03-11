@@ -7,9 +7,11 @@
 | フロントエンド | Vite + React                       |
 | バックエンド   | Hono                               |
 | DB             | Cloudflare D1                      |
+| KV             | Cloudflare KV                      |
 | ORM            | Drizzle                            |
 | ホスティング   | Cloudflare Workers（api・web両方） |
 | モノレポ       | bun workspaces + Turborepo         |
+| データフェッチ | SWR（フロントエンド）              |
 
 ---
 
@@ -29,6 +31,8 @@ seedlog/
 
 ## フロー
 
+### GitHub push → ログ記録
+
 ```
 GitHub push
 　↓
@@ -41,6 +45,22 @@ Discord REST API を叩いてユーザーにDMを送る
 ユーザーがDiscordで返信（Interactions Endpoint / モーダル）
 　↓
 Cloudflare Worker が返信を受け取りDBに保存
+```
+
+### ユーザー認証フロー（GitHub OAuth）
+
+```
+ユーザーが web にアクセス
+　↓
+GET /api/auth/github → GitHub OAuth 認可画面へリダイレクト
+　↓
+GitHub でログイン・許可
+　↓
+GET /api/auth/github/callback → アクセストークン取得・暗号化してDB保存
+　↓
+署名付き httpOnly cookie（github_user）をセット
+　↓
+フロントに githubLogin をクエリパラメータで渡してリダイレクト
 ```
 
 ---
