@@ -150,3 +150,20 @@ export const episodeResponseSchema = z.object({
 
 export type EpisodeRequest = z.infer<typeof episodeRequestSchema>;
 export type EpisodeResponse = z.infer<typeof episodeResponseSchema>;
+
+// ---- Repos ----
+
+export const repoSchema = z.object({
+  name: z.string(),
+  fullName: z.string(),
+  private: z.boolean(),
+  description: z.string().nullable(),
+  updatedAt: z.string()
+});
+
+export const reposResponseSchema = z.object({
+  repos: z.array(repoSchema)
+});
+
+export type Repo = z.infer<typeof repoSchema>;
+export type ReposResponse = z.infer<typeof reposResponseSchema>;
