@@ -1,11 +1,59 @@
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { getSignedCookie } from "hono/cookie";
+import type { Repo, ReposResponse } from "@seedlog/schema";
 import { createDb } from "../db";
 import { users } from "../db/schema";
 import { decryptToken } from "../lib/token-crypto";
 
 const reposRoute = new Hono<{ Bindings: CloudflareBindings }>();
+
+type GitHubRepo = {
+  name: string;
+  full_name: string;
+  private: boolean;
+  description: string | null;
+  updated_at: string;
+};
+
+async function fetchAllRepos(accessToken: string): Promise<Repo[]> {
+  const repos: Repo[] = [];
+  let url: string | null =
+    "https://api.github.com/user/repos?type=owner&sort=updated&per_page=100";
+
+  while (url) {
+    const res: Response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "User-Agent": "seedlog-api",
+        Accept: "application/vnd.github+json"
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error(`GitHub API error: ${res.status}`);
+    }
+
+    const page = (await res.json()) as GitHubRepo[];
+    repos.push(
+      ...page.map((r) => ({
+        name: r.name,
+        fullName: r.full_name,
+        private: r.private,
+        description: r.description,
+        updatedAt: r.updated_at
+      }))
+    );
+
+    const link: string = res.headers.get("Link") ?? "";
+    const nextMatch: RegExpMatchArray | null = link.match(
+      /<([^>]+)>;\s*rel="next"/
+    );
+    url = nextMatch ? nextMatch[1] : null;
+  }
+
+  return repos;
+}
 
 reposRoute.get("/", async (c) => {
   const githubLogin = await getSignedCookie(
@@ -45,24 +93,30 @@ reposRoute.get("/", async (c) => {
     );
   }
 
-  const accessToken = await decryptToken(
-    user.githubAccessToken,
-    c.env.GITHUB_TOKEN_ENCRYPTION_KEY
-  );
+  let accessToken: string;
+  try {
+    accessToken = await decryptToken(
+      user.githubAccessToken,
+      c.env.GITHUB_TOKEN_ENCRYPTION_KEY
+    );
+  } catch {
+    return c.json(
+      {
+        error: {
+          code: "UNAUTHORIZED",
+          message:
+            "アクセストークンの復号に失敗しました。再度GitHubログインしてください。"
+        }
+      },
+      401
+    );
+  }
 
-  const res = await fetch(
-    "https://api.github.com/user/repos?type=owner&sort=updated&per_page=100",
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "User-Agent": "seedlog-api",
-        Accept: "application/vnd.github+json"
-      }
-    }
-  );
-
-  if (!res.ok) {
-    console.error("GitHub repos fetch error:", await res.text());
+  let repos: Repo[];
+  try {
+    repos = await fetchAllRepos(accessToken);
+  } catch (err) {
+    console.error("GitHub repos fetch error:", err);
     return c.json(
       {
         error: {
@@ -74,23 +128,9 @@ reposRoute.get("/", async (c) => {
     );
   }
 
-  const rawRepos = (await res.json()) as {
-    name: string;
-    full_name: string;
-    private: boolean;
-    description: string | null;
-    updated_at: string;
-  }[];
-
-  const repos = rawRepos.map((r) => ({
-    name: r.name,
-    fullName: r.full_name,
-    private: r.private,
-    description: r.description,
-    updatedAt: r.updated_at
-  }));
-
-  return c.json({ repos });
+  c.header("Cache-Control", "private, no-store");
+  c.header("Vary", "Cookie");
+  return c.json({ repos } satisfies ReposResponse);
 });
 
 export { reposRoute };

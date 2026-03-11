@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { createDb } from "./db";
 import { authRoute } from "./routes/auth";
 import { episodesRoute } from "./routes/episodes";
@@ -11,6 +12,16 @@ import { usersRoute } from "./routes/users";
 import { webhooksRoute } from "./routes/webhooks";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
+
+app.use("/api/*", async (c, next) => {
+  const handler = cors({
+    origin: c.env.FRONTEND_URL,
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type"],
+    credentials: true
+  });
+  return handler(c, next);
+});
 
 app.get("/", (c) => {
   return c.json({ message: "Seedlog API" });
