@@ -258,7 +258,7 @@ error?: string
 ```typescript
 {
   ok: true;
-  hookId: number;
+  hookId: number | null; // 新規登録時は GitHub の hook ID、既存確認に失敗した場合は null
 }
 ```
 
