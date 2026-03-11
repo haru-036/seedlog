@@ -39,7 +39,8 @@ ${userPrompt}
 回答のみを出力してください（前置きや説明は不要）。
 `.trim();
 
-const FALLBACK_EPISODE = "ログの要約を生成できませんでした。しばらく後にもう一度お試しください。";
+const FALLBACK_EPISODE =
+  "ログの要約を生成できませんでした。しばらく後にもう一度お試しください。";
 
 export async function generateQuestion(
   apiKey: string,

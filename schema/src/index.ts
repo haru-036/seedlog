@@ -57,7 +57,13 @@ export const discordInteractionSchema = z.object({
           z.object({
             type: z.number(),
             components: z
-              .array(z.object({ type: z.number(), custom_id: z.string(), value: z.string().optional() }))
+              .array(
+                z.object({
+                  type: z.number(),
+                  custom_id: z.string(),
+                  value: z.string().optional()
+                })
+              )
               .optional()
           })
         )
@@ -108,7 +114,12 @@ export type RegisterWebhookInput = z.infer<typeof registerWebhookSchema>;
 
 // ---- Logs ----
 
-export const logSourceSchema = z.enum(["github_push", "discord_reply", "discord_command", "web"]);
+export const logSourceSchema = z.enum([
+  "github_push",
+  "discord_reply",
+  "discord_command",
+  "web"
+]);
 
 export const logResponseSchema = z.object({
   id: z.string(),

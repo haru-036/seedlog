@@ -107,18 +107,19 @@ export default function ReposPage() {
         <div>
           <h2 className="text-lg font-semibold">リポジトリ選択</h2>
           <p className="text-gray-400 text-sm mt-1">
-            Webhook を登録するリポジトリを選んでください。push されると自動で質問が届きます。
+            Webhook を登録するリポジトリを選んでください。push
+            されると自動で質問が届きます。
           </p>
         </div>
 
-        {isLoading && (
-          <p className="text-gray-400 text-sm">読み込み中...</p>
-        )}
+        {isLoading && <p className="text-gray-400 text-sm">読み込み中...</p>}
         {error && (
           <p className="text-red-400 text-sm">リポジトリの取得に失敗しました</p>
         )}
         {!isLoading && !error && repos.length === 0 && (
-          <p className="text-gray-400 text-sm">リポジトリが見つかりませんでした。</p>
+          <p className="text-gray-400 text-sm">
+            リポジトリが見つかりませんでした。
+          </p>
         )}
 
         <div className="space-y-2">

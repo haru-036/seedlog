@@ -46,7 +46,9 @@ async function fetchAllRepos(accessToken: string): Promise<Repo[]> {
     );
 
     const link: string = res.headers.get("Link") ?? "";
-    const nextMatch: RegExpMatchArray | null = link.match(/<([^>]+)>;\s*rel="next"/);
+    const nextMatch: RegExpMatchArray | null = link.match(
+      /<([^>]+)>;\s*rel="next"/
+    );
     url = nextMatch ? nextMatch[1] : null;
   }
 
@@ -132,4 +134,3 @@ reposRoute.get("/", async (c) => {
 });
 
 export { reposRoute };
-

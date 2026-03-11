@@ -11,4 +11,3 @@ export default function App() {
   if (path === "/repos") return <ReposPage />;
   return <LoginPage />;
 }
-

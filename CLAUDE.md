@@ -69,9 +69,9 @@ bun run deploy   # ビルド → wrangler deploy
 
 ## デプロイ
 
-| パッケージ | サービス                          | コマンド         |
-| ---------- | --------------------------------- | ---------------- |
-| api/       | Cloudflare Workers                | `bun run deploy` |
+| パッケージ | サービス                           | コマンド         |
+| ---------- | ---------------------------------- | ---------------- |
+| api/       | Cloudflare Workers                 | `bun run deploy` |
 | web/       | Cloudflare Workers (Static Assets) | `bun run deploy` |
 
 初回は `wrangler login` で認証が必要。
@@ -95,12 +95,12 @@ bun run deploy   # ビルド → wrangler deploy
 
 ### いつ更新するか
 
-| 変更内容 | 更新するファイル |
-|---------|---------------|
-| APIエンドポイントの追加・変更・削除 | `docs/api.md` |
-| DBスキーマの変更（テーブル・カラム） | `docs/architecture.md` |
-| 設計上の意思決定（なぜそうするか・何を却下したか） | `docs/decisions.md` |
-| 技術スタックの変更 | `docs/architecture.md` |
+| 変更内容                                           | 更新するファイル       |
+| -------------------------------------------------- | ---------------------- |
+| APIエンドポイントの追加・変更・削除                | `docs/api.md`          |
+| DBスキーマの変更（テーブル・カラム）               | `docs/architecture.md` |
+| 設計上の意思決定（なぜそうするか・何を却下したか） | `docs/decisions.md`    |
+| 技術スタックの変更                                 | `docs/architecture.md` |
 
 ### docs/api.md
 

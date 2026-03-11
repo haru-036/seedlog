@@ -27,10 +27,10 @@
 
 ```typescript
 {
-  id: string;              // nanoid() で生成される21文字のURL-safeな一意識別子
+  id: string; // nanoid() で生成される21文字のURL-safeな一意識別子
   discordId: string | null; // Discord 未連携の場合は null
   githubLogin: string;
-  createdAt: string;       // ISO 8601
+  createdAt: string; // ISO 8601
 }
 ```
 
@@ -38,7 +38,12 @@
 
 - `409 Conflict` — discordId または githubLogin がすでに登録済み
   ```json
-  { "error": { "code": "CONFLICT", "message": "discordIdはすでに登録されています" } }
+  {
+    "error": {
+      "code": "CONFLICT",
+      "message": "discordIdはすでに登録されています"
+    }
+  }
   ```
 - `400 Bad Request` — バリデーションエラー
 
@@ -171,12 +176,13 @@ error?: string
 ```typescript
 {
   repos: {
-    name: string;           // リポジトリ名
-    fullName: string;       // "owner/repo" 形式
+    name: string; // リポジトリ名
+    fullName: string; // "owner/repo" 形式
     private: boolean;
     description: string | null;
-    updatedAt: string;      // ISO 8601
-  }[];
+    updatedAt: string; // ISO 8601
+  }
+  [];
 }
 ```
 
@@ -220,7 +226,10 @@ error?: string
 **Response** `201 Created`
 
 ```typescript
-{ ok: true; hookId: number }
+{
+  ok: true;
+  hookId: number;
+}
 ```
 
 **Error Responses**
@@ -375,7 +384,8 @@ offset?: number
     content: string;
     source: "github_push" | "discord_reply" | "discord_command" | "web";
     createdAt: string; // ISO 8601
-  }[];
+  }
+  [];
   total: number;
   hasMore: boolean;
 }
@@ -456,7 +466,10 @@ offset?: number
 - `404 Not Found` — ユーザーが見つからない
 - `422 Unprocessable Entity` — ログが0件
   ```json
-  { "error": { "code": "NO_LOGS", "message": "ログがまだありません。ログを記録してからお試しください。" } }
+  {
+    "error": {
+      "code": "NO_LOGS",
+      "message": "ログがまだありません。ログを記録してからお試しください。"
+    }
+  }
   ```
-
- 
