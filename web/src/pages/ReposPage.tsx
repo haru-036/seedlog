@@ -7,7 +7,7 @@ type WebhookStatus = "idle" | "loading" | "done" | "exists" | "error";
 
 function RepoItem({
   repo,
-  isRegistered,
+  isRegistered
 }: {
   repo: Repo;
   isRegistered: boolean;
