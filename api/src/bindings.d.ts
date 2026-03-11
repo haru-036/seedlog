@@ -14,4 +14,6 @@ declare interface CloudflareBindings {
   GITHUB_TOKEN_ENCRYPTION_KEY: string;
   // HMAC-SHA256 signing secret for httpOnly cookies (arbitrary string, min 32 chars)
   COOKIE_SECRET: string;
+  // Cloudflare KV for storing webhook registrations per user
+  WEBHOOK_KV: KVNamespace;
 }

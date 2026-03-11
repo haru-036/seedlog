@@ -7,7 +7,61 @@ import { createDb } from "../db";
 import { users } from "../db/schema";
 import { decryptToken } from "../lib/token-crypto";
 
+type WebhookRecord = { repo: string; hookId: number };
+
+async function getWebhookRecords(
+  kv: KVNamespace,
+  userId: string
+): Promise<WebhookRecord[]> {
+  const data = await kv.get<WebhookRecord[]>(`webhooks:${userId}`, "json");
+  return data ?? [];
+}
+
+async function addWebhookRecord(
+  kv: KVNamespace,
+  userId: string,
+  repo: string,
+  hookId: number
+): Promise<void> {
+  const records = await getWebhookRecords(kv, userId);
+  if (!records.some((r) => r.repo === repo)) {
+    records.push({ repo, hookId });
+    await kv.put(`webhooks:${userId}`, JSON.stringify(records));
+  }
+}
+
 const webhooksRoute = new Hono<{ Bindings: CloudflareBindings }>();
+
+webhooksRoute.get("/", async (c) => {
+  const githubLogin = await getSignedCookie(
+    c,
+    c.env.COOKIE_SECRET,
+    "github_user"
+  );
+  if (!githubLogin) {
+    return c.json(
+      { error: { code: "UNAUTHORIZED", message: "GitHub認証が必要です" } },
+      401
+    );
+  }
+
+  const db = createDb(c.env.DB);
+  const user = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.githubLogin, githubLogin))
+    .get();
+
+  if (!user) {
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "ユーザーが見つかりません" } },
+      404
+    );
+  }
+
+  const records = await getWebhookRecords(c.env.WEBHOOK_KV, user.id);
+  return c.json({ repos: records.map((r) => r.repo) });
+});
 
 webhooksRoute.post(
   "/register",
@@ -105,6 +159,7 @@ webhooksRoute.post(
           e.message === "Hook already exists on this repository"
       );
       if (isAlreadyExists) {
+        await addWebhookRecord(c.env.WEBHOOK_KV, user.id, repo, 0);
         return c.json({ ok: true, message: "webhookはすでに登録済みです" });
       }
       return c.json({ ok: false, error: body }, 422);
@@ -125,6 +180,7 @@ webhooksRoute.post(
     }
 
     const hook = (await res.json()) as { id: number };
+    await addWebhookRecord(c.env.WEBHOOK_KV, user.id, repo, hook.id);
     return c.json({ ok: true, hookId: hook.id }, 201);
   }
 );
