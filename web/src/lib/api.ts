@@ -10,3 +10,15 @@ export async function apiFetch(path: string, init?: RequestInit) {
     }
   });
 }
+
+export async function fetcher<T>(path: string): Promise<T> {
+  const res = await apiFetch(path);
+  if (res.status === 401) {
+    window.location.replace("/");
+    throw new Error("Unauthorized");
+  }
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}

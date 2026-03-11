@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import type { Repo } from "@seedlog/schema";
-import { apiFetch, API_BASE } from "../lib/api";
+import { useState } from "react";
+import useSWR from "swr";
+import type { Repo, ReposResponse } from "@seedlog/schema";
+import { apiFetch, API_BASE, fetcher } from "../lib/api";
 
 type WebhookStatus = "idle" | "loading" | "done" | "exists" | "error";
 
@@ -74,26 +75,11 @@ function RepoItem({ repo }: { repo: Repo }) {
 
 export default function ReposPage() {
   const githubLogin = localStorage.getItem("githubLogin");
-  const [repos, setRepos] = useState<Repo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiFetch("/api/repos")
-      .then(async (res) => {
-        if (res.status === 401) {
-          window.location.replace("/");
-          return;
-        }
-        if (!res.ok) throw new Error("リポジトリの取得に失敗しました");
-        const data = (await res.json()) as { repos: Repo[] };
-        setRepos(data.repos);
-      })
-      .catch((e: unknown) =>
-        setError(e instanceof Error ? e.message : "エラーが発生しました")
-      )
-      .finally(() => setLoading(false));
-  }, []);
+  const { data, error, isLoading } = useSWR<ReposResponse>(
+    "/api/repos",
+    fetcher
+  );
+  const repos = data?.repos ?? [];
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -120,13 +106,13 @@ export default function ReposPage() {
           </p>
         </div>
 
-        {loading && (
+        {isLoading && (
           <p className="text-gray-400 text-sm">読み込み中...</p>
         )}
         {error && (
-          <p className="text-red-400 text-sm">{error}</p>
+          <p className="text-red-400 text-sm">リポジトリの取得に失敗しました</p>
         )}
-        {!loading && !error && repos.length === 0 && (
+        {!isLoading && !error && repos.length === 0 && (
           <p className="text-gray-400 text-sm">リポジトリが見つかりませんでした。</p>
         )}
 
