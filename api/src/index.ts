@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "./db";
 import { authRoute } from "./routes/auth";
+import { episodesRoute } from "./routes/episodes";
 import { githubRoute } from "./routes/github";
 import { interactionsRoute } from "./routes/interactions";
 import { logsRoute } from "./routes/logs";
@@ -26,5 +27,6 @@ app.route("/api/webhooks", githubRoute);
 app.route("/api/webhooks", webhooksRoute);
 app.route("/api/interactions", interactionsRoute);
 app.route("/api/logs", logsRoute);
+app.route("/api/episodes", episodesRoute);
 
 export default app;

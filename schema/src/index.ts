@@ -136,3 +136,17 @@ export const logsListResponseSchema = z.object({
 });
 
 export type LogsListResponse = z.infer<typeof logsListResponseSchema>;
+
+// ---- Episodes ----
+
+export const episodeRequestSchema = z.object({
+  userId: z.string().min(1, "userIdは必須です"),
+  prompt: z.string().min(1, "promptは必須です")
+});
+
+export const episodeResponseSchema = z.object({
+  episode: z.string()
+});
+
+export type EpisodeRequest = z.infer<typeof episodeRequestSchema>;
+export type EpisodeResponse = z.infer<typeof episodeResponseSchema>;
