@@ -158,6 +158,42 @@ error?: string
 
 ---
 
+### `GET /api/repos` ✅ 実装済み
+
+ログイン済みユーザーの GitHub リポジトリ一覧を取得する。フロントエンドでリポジトリを選択し、`POST /api/webhooks/register` に渡すために使用する。
+
+**認証**
+
+`github_user` 署名済み Cookie（GitHub OAuth ログイン後に自動セット）
+
+**Response** `200 OK`
+
+```typescript
+{
+  repos: {
+    name: string;           // リポジトリ名
+    fullName: string;       // "owner/repo" 形式
+    private: boolean;
+    description: string | null;
+    updatedAt: string;      // ISO 8601
+  }[];
+}
+```
+
+**取得条件**
+
+- type=owner（自分がオーナーのリポジトリのみ）
+- sort=updated（最終更新順）
+- per_page=100（最大100件）
+
+**Error Responses**
+
+- `401 Unauthorized` — 未ログイン、または GitHub 未連携
+- `404 Not Found` — ユーザーが見つからない
+- `502 Bad Gateway` — GitHub API エラー
+
+---
+
 ### `POST /api/webhooks/register` ✅ 実装済み
 
 指定リポジトリに GitHub Webhook を自動登録する。

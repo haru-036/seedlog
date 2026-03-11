@@ -6,6 +6,7 @@ import { episodesRoute } from "./routes/episodes";
 import { githubRoute } from "./routes/github";
 import { interactionsRoute } from "./routes/interactions";
 import { logsRoute } from "./routes/logs";
+import { reposRoute } from "./routes/repos";
 import { usersRoute } from "./routes/users";
 import { webhooksRoute } from "./routes/webhooks";
 
@@ -28,5 +29,6 @@ app.route("/api/webhooks", webhooksRoute);
 app.route("/api/interactions", interactionsRoute);
 app.route("/api/logs", logsRoute);
 app.route("/api/episodes", episodesRoute);
+app.route("/api/repos", reposRoute);
 
 export default app;
