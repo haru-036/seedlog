@@ -20,15 +20,6 @@ function RepoItem({
     isRegistered ? "done" : "idle"
   );
 
-  useEffect(() => {
-    setStatus((prev) => {
-      // 登録済みに変化したときだけ "done" に更新する（ユーザー操作中は上書きしない）
-      if (isRegistered && prev === "idle") return "done";
-      if (!isRegistered && prev === "done") return "idle";
-      return prev;
-    });
-  }, [isRegistered]);
-
   async function registerWebhook() {
     setStatus("loading");
     try {
@@ -154,13 +145,16 @@ export default function ReposPage() {
         )}
 
         <div className="space-y-2">
-          {repos.map((repo) => (
-            <RepoItem
-              key={repo.fullName}
-              repo={repo}
-              isRegistered={registeredSet.has(repo.fullName)}
-            />
-          ))}
+          {repos.map((repo) => {
+            const isRegistered = registeredSet.has(repo.fullName);
+            return (
+              <RepoItem
+                key={`${repo.fullName}-${String(isRegistered)}`}
+                repo={repo}
+                isRegistered={isRegistered}
+              />
+            );
+          })}
         </div>
 
         {!isLoading && !error && (
