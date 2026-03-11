@@ -7,7 +7,7 @@ import { createDb } from "../db";
 import { users } from "../db/schema";
 import { decryptToken } from "../lib/token-crypto";
 
-type WebhookRecord = { repo: string; hookId: number };
+type WebhookRecord = { repo: string; hookId: number | null };
 
 async function getWebhookRecords(
   kv: KVNamespace,
@@ -21,7 +21,7 @@ async function addWebhookRecord(
   kv: KVNamespace,
   userId: string,
   repo: string,
-  hookId: number
+  hookId: number | null
 ): Promise<void> {
   const records = await getWebhookRecords(kv, userId);
   if (!records.some((r) => r.repo === repo)) {
@@ -159,7 +159,33 @@ webhooksRoute.post(
           e.message === "Hook already exists on this repository"
       );
       if (isAlreadyExists) {
-        await addWebhookRecord(c.env.WEBHOOK_KV, user.id, repo, 0);
+        // 既存 Webhook の実際の hookId を GitHub API から取得する
+        let existingHookId: number | null = null;
+        try {
+          const hooksRes = await fetch(
+            `https://api.github.com/repos/${owner}/${repoName}/hooks`,
+            {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "User-Agent": "seedlog-api",
+                Accept: "application/vnd.github+json"
+              }
+            }
+          );
+          if (hooksRes.ok) {
+            const hooks = (await hooksRes.json()) as {
+              id: number;
+              config: { url?: string };
+            }[];
+            const match = hooks.find(
+              (h) => h.config.url === c.env.GITHUB_WEBHOOK_URL
+            );
+            existingHookId = match?.id ?? null;
+          }
+        } catch (err) {
+          console.error("既存 Webhook の hookId 取得に失敗:", err);
+        }
+        await addWebhookRecord(c.env.WEBHOOK_KV, user.id, repo, existingHookId);
         return c.json({ ok: true, message: "webhookはすでに登録済みです" });
       }
       return c.json({ ok: false, error: body }, 422);

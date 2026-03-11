@@ -171,6 +171,13 @@ error?: string
 
 `github_user` 署名済み Cookie（GitHub OAuth ログイン後に自動セット）
 
+**Query Parameters**
+
+| パラメータ | 型     | デフォルト | 説明                            |
+| ---------- | ------ | ---------- | ------------------------------- |
+| `page`     | number | `1`        | ページ番号（1始まり）           |
+| `per_page` | number | `20`       | 1ページあたりの件数（最大 100） |
+
 **Response** `200 OK`
 
 ```typescript
@@ -183,6 +190,7 @@ error?: string
     updatedAt: string; // ISO 8601
   }
   [];
+  hasNextPage: boolean; // 次のページが存在するか
 }
 ```
 
@@ -190,13 +198,35 @@ error?: string
 
 - type=owner（自分がオーナーのリポジトリのみ）
 - sort=updated（最終更新順）
-- per_page=100（最大100件）
 
 **Error Responses**
 
 - `401 Unauthorized` — 未ログイン、または GitHub 未連携
 - `404 Not Found` — ユーザーが見つからない
 - `502 Bad Gateway` — GitHub API エラー
+
+---
+
+### `GET /api/webhooks` ✅ 実装済み
+
+ログイン済みユーザーが Webhook 登録済みのリポジトリ一覧を返す。フロントエンドでの初期表示に使用する。
+
+**認証**
+
+`github_user` 署名済み Cookie（GitHub OAuth ログイン後に自動セット）
+
+**Response** `200 OK`
+
+```typescript
+{
+  repos: string[]; // 登録済みリポジトリの fullName 一覧（"owner/repo" 形式）
+}
+```
+
+**Error Responses**
+
+- `401 Unauthorized` — 未ログイン
+- `404 Not Found` — ユーザーが見つからない
 
 ---
 

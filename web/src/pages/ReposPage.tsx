@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
-import useSWR, { useSWRConfig } from "swr";
-import type { Repo, ReposResponse } from "@seedlog/schema";
+import useSWR, { mutate } from "swr";
+import type {
+  Repo,
+  ReposResponse,
+  WebhooksListResponse
+} from "@seedlog/schema";
 import { apiFetch, API_BASE, fetcher } from "../lib/api";
 
 type WebhookStatus = "idle" | "loading" | "done" | "exists" | "error";
@@ -12,10 +16,18 @@ function RepoItem({
   repo: Repo;
   isRegistered: boolean;
 }) {
-  const { mutate } = useSWRConfig();
   const [status, setStatus] = useState<WebhookStatus>(
     isRegistered ? "done" : "idle"
   );
+
+  useEffect(() => {
+    setStatus((prev) => {
+      // 登録済みに変化したときだけ "done" に更新する（ユーザー操作中は上書きしない）
+      if (isRegistered && prev === "idle") return "done";
+      if (!isRegistered && prev === "done") return "idle";
+      return prev;
+    });
+  }, [isRegistered]);
 
   async function registerWebhook() {
     setStatus("loading");
@@ -97,7 +109,7 @@ export default function ReposPage() {
     `/api/repos?page=${page}&per_page=20`,
     fetcher
   );
-  const { data: webhooksData } = useSWR<{ repos: string[] }>(
+  const { data: webhooksData } = useSWR<WebhooksListResponse>(
     "/api/webhooks",
     fetcher
   );
