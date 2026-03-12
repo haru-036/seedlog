@@ -49,7 +49,7 @@ export async function generateQuestion(
   const ai = new GoogleGenAI({ apiKey });
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.1-flash-lite-preview",
       contents: QUESTION_PROMPT(changedFiles)
     });
     return response.text ?? FALLBACK_QUESTION;
@@ -67,7 +67,7 @@ export async function generateEpisode(
   const ai = new GoogleGenAI({ apiKey });
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.1-flash-lite-preview",
       contents: EPISODE_PROMPT(logContents, userPrompt)
     });
     return response.text ?? FALLBACK_EPISODE;
