@@ -2,16 +2,16 @@
 
 ## 技術スタック
 
-| 役割           | 技術                               |
-| -------------- | ---------------------------------- |
-| フロントエンド | Vite + React                       |
-| バックエンド   | Hono                               |
-| DB             | Cloudflare D1                      |
-| KV             | Cloudflare KV                      |
-| ORM            | Drizzle                            |
-| ホスティング   | Cloudflare Workers（api・web両方） |
-| モノレポ       | bun workspaces + Turborepo         |
-| データフェッチ | SWR（フロントエンド）              |
+| 役割             | 技術                               |
+| ---------------- | ---------------------------------- |
+| フロントエンド   | Vite + React                       |
+| バックエンド     | Hono                               |
+| DB               | Cloudflare D1                      |
+| KV               | Cloudflare KV                      |
+| ORM              | Drizzle                            |
+| ホスティング     | Cloudflare Workers（api・web両方） |
+| モノレポ         | bun workspaces + Turborepo         |
+| データフェッチ   | SWR（フロントエンド）              |
 | API ドキュメント | hono-openapi + Scalar（`/scalar`） |
 
 ---
