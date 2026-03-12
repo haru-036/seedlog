@@ -68,7 +68,7 @@ app.get(
         version: "0.1.0",
         description: "Seedlog のバックエンド API"
       },
-      servers: [{ url: "https://seedlog-api.harurahu.workers.dev" }]
+      servers: [{ url: "/" }]
     }
   })
 );
