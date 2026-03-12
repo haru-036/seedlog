@@ -52,6 +52,9 @@ webhooksRoute.get(
     }
   }),
   async (c) => {
+    c.header("Cache-Control", "private, no-store");
+    c.header("Vary", "Cookie");
+
     const githubLogin = await getSignedCookie(
       c,
       c.env.COOKIE_SECRET,

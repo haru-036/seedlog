@@ -118,6 +118,17 @@ reposRoute.get(
 
     if (!res.ok) {
       console.error("GitHub API error:", res.status);
+      if (res.status === 401 || res.status === 403) {
+        return c.json(
+          {
+            error: {
+              code: "GITHUB_AUTH_ERROR",
+              message: "GitHub認証に失敗しました。再度ログインしてください"
+            }
+          },
+          res.status
+        );
+      }
       return c.json(
         {
           error: {
