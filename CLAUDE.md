@@ -46,7 +46,8 @@ export type Example = z.infer<typeof exampleSchema>;
 
 - ランタイムは Cloudflare Workers
 - `export default app` でエントリポイントを公開する（`Bun.serve()` は使わない）
-- バリデーションは `@hono/zod-validator` + `@seedlog/schema` を使う
+- バリデーションは原則 `@hono/zod-validator` の `zValidator` + `@seedlog/schema` を使う
+- ただし `describeRoute` で OpenAPI ドキュメント対象にするルートは、リクエストスキーマを Scalar に自動登録するため `hono-openapi` の `validator` を使う（`zValidator` は OpenAPI スペックへの自動登録機能を持たない）
 - `wrangler.jsonc` で Workers の設定を管理
 
 ```sh

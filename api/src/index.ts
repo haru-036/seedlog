@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { Scalar } from "@scalar/hono-api-reference";
+import { openAPIRouteHandler } from "hono-openapi";
 import { createDb } from "./db";
 import { AppError } from "./lib/errors";
 import { authRoute } from "./routes/auth";
@@ -56,5 +58,21 @@ app.route("/api/interactions", interactionsRoute);
 app.route("/api/logs", logsRoute);
 app.route("/api/episodes", episodesRoute);
 app.route("/api/repos", reposRoute);
+
+app.get(
+  "/openapi.json",
+  openAPIRouteHandler(app, {
+    documentation: {
+      info: {
+        title: "Seedlog API",
+        version: "0.1.0",
+        description: "Seedlog のバックエンド API"
+      },
+      servers: [{ url: "/" }]
+    }
+  })
+);
+
+app.get("/scalar", Scalar({ theme: "saturn", url: "/openapi.json" }));
 
 export default app;

@@ -1,6 +1,6 @@
-import { zValidator } from "@hono/zod-validator";
 import { eq, or } from "drizzle-orm";
 import { Hono } from "hono";
+import { describeRoute, resolver, validator } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { createUserSchema, userResponseSchema } from "@seedlog/schema";
 import { createDb } from "../db";
@@ -22,42 +22,46 @@ function toUserResponse(user: {
   });
 }
 
-usersRoute.post("/", zValidator("json", createUserSchema), async (c) => {
-  const { discordId, githubLogin } = c.req.valid("json");
-  const db = createDb(c.env.DB);
-
-  const existing = await db
-    .select()
-    .from(users)
-    .where(
-      discordId
-        ? or(eq(users.discordId, discordId), eq(users.githubLogin, githubLogin))
-        : eq(users.githubLogin, githubLogin)
-    )
-    .get();
-
-  if (existing) {
-    const field =
-      existing.githubLogin === githubLogin
-        ? "githubLogin"
-        : discordId && existing.discordId === discordId
-          ? "discordId"
-          : "githubLogin";
-    return c.json(
-      {
-        error: { code: "CONFLICT", message: `${field}はすでに登録されています` }
+usersRoute.post(
+  "/",
+  describeRoute({
+    description: "ユーザーを登録する",
+    tags: ["Users"],
+    responses: {
+      201: {
+        description: "ユーザー作成成功",
+        content: {
+          "application/json": { schema: resolver(userResponseSchema) }
+        }
       },
-      409
-    );
-  }
+      409: { description: "githubLogin または discordId が重複" }
+    }
+  }),
+  validator("json", createUserSchema),
+  async (c) => {
+    const { discordId, githubLogin } = c.req.valid("json");
+    const db = createDb(c.env.DB);
 
-  const id = nanoid();
-  try {
-    await db.insert(users).values({ id, discordId, githubLogin });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("UNIQUE")) {
-      const field = msg.includes("discord_id") ? "discordId" : "githubLogin";
+    const existing = await db
+      .select()
+      .from(users)
+      .where(
+        discordId
+          ? or(
+              eq(users.discordId, discordId),
+              eq(users.githubLogin, githubLogin)
+            )
+          : eq(users.githubLogin, githubLogin)
+      )
+      .get();
+
+    if (existing) {
+      const field =
+        existing.githubLogin === githubLogin
+          ? "githubLogin"
+          : discordId && existing.discordId === discordId
+            ? "discordId"
+            : "githubLogin";
       return c.json(
         {
           error: {
@@ -68,38 +72,76 @@ usersRoute.post("/", zValidator("json", createUserSchema), async (c) => {
         409
       );
     }
-    throw err;
-  }
 
-  const user = await db.select().from(users).where(eq(users.id, id)).get();
-  if (!user) {
-    return c.json(
-      {
-        error: {
-          code: "INTERNAL_ERROR",
-          message: "ユーザーの作成に失敗しました"
+    const id = nanoid();
+    try {
+      await db.insert(users).values({ id, discordId, githubLogin });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("UNIQUE")) {
+        const field = msg.includes("discord_id") ? "discordId" : "githubLogin";
+        return c.json(
+          {
+            error: {
+              code: "CONFLICT",
+              message: `${field}はすでに登録されています`
+            }
+          },
+          409
+        );
+      }
+      throw err;
+    }
+
+    const user = await db.select().from(users).where(eq(users.id, id)).get();
+    if (!user) {
+      return c.json(
+        {
+          error: {
+            code: "INTERNAL_ERROR",
+            message: "ユーザーの作成に失敗しました"
+          }
+        },
+        500
+      );
+    }
+
+    return c.json(toUserResponse(user), 201);
+  }
+);
+
+usersRoute.get(
+  "/:id",
+  describeRoute({
+    description: "ユーザー情報を取得する",
+    tags: ["Users"],
+    parameters: [
+      { name: "id", in: "path", required: true, schema: { type: "string" } }
+    ],
+    responses: {
+      200: {
+        description: "ユーザー情報",
+        content: {
+          "application/json": { schema: resolver(userResponseSchema) }
         }
       },
-      500
-    );
+      404: { description: "ユーザーが見つかりません" }
+    }
+  }),
+  async (c) => {
+    const id = c.req.param("id");
+    const db = createDb(c.env.DB);
+
+    const user = await db.select().from(users).where(eq(users.id, id)).get();
+    if (!user) {
+      return c.json(
+        { error: { code: "NOT_FOUND", message: "ユーザーが見つかりません" } },
+        404
+      );
+    }
+
+    return c.json(toUserResponse(user));
   }
-
-  return c.json(toUserResponse(user), 201);
-});
-
-usersRoute.get("/:id", async (c) => {
-  const id = c.req.param("id");
-  const db = createDb(c.env.DB);
-
-  const user = await db.select().from(users).where(eq(users.id, id)).get();
-  if (!user) {
-    return c.json(
-      { error: { code: "NOT_FOUND", message: "ユーザーが見つかりません" } },
-      404
-    );
-  }
-
-  return c.json(toUserResponse(user));
-});
+);
 
 export { usersRoute };
