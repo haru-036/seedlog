@@ -80,7 +80,11 @@ githubRoute.post("/github", async (c) => {
     );
   }
 
-  const { pusher, repository, head_commit, commits } = parsed.data;
+  const { pusher, repository, head_commit, commits, ref } = parsed.data;
+
+  if (ref !== "refs/heads/main") {
+    return c.json({ ok: true });
+  }
 
   if (!head_commit) {
     return c.json({ ok: true });
