@@ -46,7 +46,7 @@ episodesRoute.post(
       .select({ content: logs.content, createdAt: logs.createdAt })
       .from(logs)
       .where(eq(logs.userId, userId))
-      .orderBy(logs.createdAt)
+      .orderBy(logs.createdAt, logs.id)
       .all();
 
     if (userLogs.length === 0) {
