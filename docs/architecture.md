@@ -12,6 +12,7 @@
 | ホスティング   | Cloudflare Workers（api・web両方） |
 | モノレポ       | bun workspaces + Turborepo         |
 | データフェッチ | SWR（フロントエンド）              |
+| API ドキュメント | hono-openapi + Scalar（`/scalar`） |
 
 ---
 

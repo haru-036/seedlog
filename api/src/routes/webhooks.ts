@@ -1,8 +1,11 @@
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { getSignedCookie } from "hono/cookie";
-import { zValidator } from "@hono/zod-validator";
-import { registerWebhookSchema } from "@seedlog/schema";
+import { describeRoute, resolver, validator } from "hono-openapi";
+import {
+  registerWebhookSchema,
+  webhooksListResponseSchema
+} from "@seedlog/schema";
 import { createDb } from "../db";
 import { users } from "../db/schema";
 import { decryptToken } from "../lib/token-crypto";
@@ -32,40 +35,67 @@ async function addWebhookRecord(
 
 const webhooksRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
-webhooksRoute.get("/", async (c) => {
-  const githubLogin = await getSignedCookie(
-    c,
-    c.env.COOKIE_SECRET,
-    "github_user"
-  );
-  if (!githubLogin) {
-    return c.json(
-      { error: { code: "UNAUTHORIZED", message: "GitHub認証が必要です" } },
-      401
+webhooksRoute.get(
+  "/",
+  describeRoute({
+    description:
+      "登録済み Webhook リポジトリ一覧を取得する（要: github_user Cookie）",
+    tags: ["Webhooks"],
+    responses: {
+      200: {
+        description: "Webhook 登録済みリポジトリ一覧",
+        content: {
+          "application/json": { schema: resolver(webhooksListResponseSchema) }
+        }
+      },
+      401: { description: "GitHub認証が必要です" }
+    }
+  }),
+  async (c) => {
+    const githubLogin = await getSignedCookie(
+      c,
+      c.env.COOKIE_SECRET,
+      "github_user"
     );
+    if (!githubLogin) {
+      return c.json(
+        { error: { code: "UNAUTHORIZED", message: "GitHub認証が必要です" } },
+        401
+      );
+    }
+
+    const db = createDb(c.env.DB);
+    const user = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.githubLogin, githubLogin))
+      .get();
+
+    if (!user) {
+      return c.json(
+        { error: { code: "NOT_FOUND", message: "ユーザーが見つかりません" } },
+        404
+      );
+    }
+
+    const records = await getWebhookRecords(c.env.WEBHOOK_KV, user.id);
+    return c.json({ repos: records.map((r) => r.repo) });
   }
-
-  const db = createDb(c.env.DB);
-  const user = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.githubLogin, githubLogin))
-    .get();
-
-  if (!user) {
-    return c.json(
-      { error: { code: "NOT_FOUND", message: "ユーザーが見つかりません" } },
-      404
-    );
-  }
-
-  const records = await getWebhookRecords(c.env.WEBHOOK_KV, user.id);
-  return c.json({ repos: records.map((r) => r.repo) });
-});
+);
 
 webhooksRoute.post(
   "/register",
-  zValidator("json", registerWebhookSchema),
+  describeRoute({
+    description:
+      "GitHub リポジトリに Webhook を登録する（要: github_user Cookie）",
+    tags: ["Webhooks"],
+    responses: {
+      201: { description: "Webhook 登録成功" },
+      200: { description: "Webhook は登録済み" },
+      401: { description: "GitHub認証が必要です" }
+    }
+  }),
+  validator("json", registerWebhookSchema),
   async (c) => {
     if (!c.env.GITHUB_WEBHOOK_SECRET) {
       console.error("GITHUB_WEBHOOK_SECRET is required but not set");
