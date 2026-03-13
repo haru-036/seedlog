@@ -72,28 +72,43 @@ async function hasBotInAnyManageableGuild(
     permissions?: string;
   }>;
 
-  for (const guild of guilds) {
-    if (!canManageGuild(guild)) continue;
+  const manageableGuildIds = guilds.filter(canManageGuild).map((g) => g.id);
+  if (manageableGuildIds.length === 0) return false;
 
-    const memberRes = await fetch(
-      `https://discord.com/api/v10/guilds/${guild.id}/members/${applicationId}`,
-      {
-        headers: { Authorization: `Bot ${botToken}` }
+  const checks = manageableGuildIds.map(async (guildId) => {
+    try {
+      const memberRes = await fetch(
+        `https://discord.com/api/v10/guilds/${guildId}/members/${applicationId}`,
+        {
+          headers: { Authorization: `Bot ${botToken}` }
+        }
+      );
+
+      if (memberRes.ok) {
+        return true;
       }
-    );
 
-    if (memberRes.ok) {
-      return true;
-    }
-
-    if (memberRes.status !== 404) {
+      if (memberRes.status !== 404) {
+        console.error(
+          `Discord bot member check failed for guild ${guildId}: ${memberRes.status}`
+        );
+      }
+    } catch (err) {
       console.error(
-        `Discord bot member check failed for guild ${guild.id}: ${memberRes.status}`
+        `Discord bot member check error for guild ${guildId}:`,
+        err
       );
     }
-  }
 
-  return false;
+    throw new Error("BOT_NOT_IN_GUILD");
+  });
+
+  try {
+    await Promise.any(checks);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 authRoute.get("/discord", async (c) => {

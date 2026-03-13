@@ -102,8 +102,6 @@ X-GitHub-Event: push
 
 ---
 
-## GitHub連携
-
 ## Discord連携
 
 ### `GET /api/auth/discord` ✅ 実装済み
@@ -155,6 +153,8 @@ Discord OAuth コールバックを受け取り、ユーザー連携を確定す
 `needsBotInstall=1` の場合は、別途 `GET /api/auth/discord/install` で Bot 招待が必要。
 
 ---
+
+## GitHub連携
 
 ### `GET /api/auth/github` ✅ 実装済み
 
@@ -325,92 +325,7 @@ error?: string
 
 ---
 
-## Discord連携
-
-### `GET /api/auth/discord` ✅ 実装済み
-
-Discord OAuth 認証フローを開始する。
-
-**処理の流れ**
-
-1. CSRF 対策用のランダム state を生成し `discord_oauth_state` cookie にセット（httpOnly, Secure, SameSite=Lax, 5分）
-2. Discord の OAuth 認可画面へリダイレクト（scope: `identify bot`, permissions: `2048`）
-
-**必要な環境変数**
-
-- `DISCORD_CLIENT_ID`
-- `DISCORD_REDIRECT_URI`
-
-**レスポンス**
-
-- `302 Redirect` → Discord 認可画面
-
----
-
-### `GET /api/auth/discord/callback` ✅ 実装済み
-
-Discord OAuth コールバックを受け取る。
-
-**Query Parameters**
-
-```
-code?: string   — Discord が返す認可コード
-error?: string  — エラー時（例: "access_denied"）
-```
-
-**処理の流れ**
-
-1. `discord_oauth_state` cookie と返ってきた `state` を比較（CSRF検証）
-2. Discord に code でアクセストークンを交換
-3. Discord ユーザー情報（id, username）を取得
-4. 一時トークン（nanoid, TTL 5分）を D1 に保存
-5. フロントエンドへリダイレクト（`?code=<one-time-token>`）
-
-**必要な環境変数**
-
-- `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI`
-- `FRONTEND_URL`
-
-**成功レスポンス**
-
-- `302 Redirect` → `${FRONTEND_URL}/auth/discord/callback?code=<one-time-token>`
-
-**エラーレスポンス**
-
-- `302 Redirect` → `${FRONTEND_URL}/auth/error?reason=<reason>`
-  - `reason=access_denied` — ユーザーが認証を拒否
-  - `reason=state_mismatch` — CSRF 検証失敗
-  - `reason=token_exchange` — Discord のトークン交換失敗
-  - `reason=user_fetch` — Discord ユーザー情報の取得失敗
-
----
-
-### `GET /api/auth/discord/token` ✅ 実装済み
-
-フロントエンドが one-time code を Discord ユーザーデータと交換するエンドポイント。
-
-**Query Parameters**
-
-```
-code: string — /api/auth/discord/callback で受け取った one-time token
-```
-
-**Response** `200 OK`
-
-```typescript
-{
-  discordId: string;
-  discordUsername: string;
-}
-```
-
-**Error Responses**
-
-- `400 Bad Request` — code パラメーターが missing
-- `404 Not Found` — コードが存在しない
-- `410 Gone` — コードの有効期限切れ（TTL: 5分）
-
----
+## Discord Interactions
 
 ### `POST /api/interactions` ✅ 実装済み
 

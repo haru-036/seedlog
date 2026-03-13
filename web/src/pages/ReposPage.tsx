@@ -101,14 +101,16 @@ function RepoItem({
 export default function ReposPage() {
   const [githubLogin, setGithubLogin] = useState<string | null>(null);
   const [discordUsername, setDiscordUsername] = useState<string | null>(null);
-  const [discordBotInstalled, setDiscordBotInstalled] = useState<boolean>(true);
+  const [discordBotInstallFlag, setDiscordBotInstallFlag] = useState<
+    string | null
+  >(null);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
     setGithubLogin(localStorage.getItem("githubLogin"));
     const username = localStorage.getItem("discordUsername");
     setDiscordUsername(username);
-    setDiscordBotInstalled(localStorage.getItem("discordBotInstalled") !== "0");
+    setDiscordBotInstallFlag(localStorage.getItem("discordBotInstalled"));
   }, []);
 
   const { data, error, isLoading } = useSWR<ReposResponse>(
@@ -144,7 +146,7 @@ export default function ReposPage() {
           >
             {discordUsername ? "Discord 再連携" : "Discord 連携"}
           </a>
-          {!discordBotInstalled && (
+          {discordUsername && discordBotInstallFlag === "0" && (
             <a
               href={`${API_BASE}/api/auth/discord/install`}
               className="text-sm bg-emerald-600 text-white px-3 py-1.5 rounded hover:bg-emerald-500 transition-colors"
