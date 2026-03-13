@@ -13,7 +13,9 @@ async function exchangeCode(code: string): Promise<DiscordTokenResponse> {
 }
 
 export default function DiscordCallbackPage() {
-  const code = new URLSearchParams(window.location.search).get("code");
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  const needsBotInstall = params.get("needsBotInstall") === "1";
 
   const { data, error } = useSWR(
     code ? ["discord-token", code] : null,
@@ -32,13 +34,14 @@ export default function DiscordCallbackPage() {
     if (data) {
       localStorage.setItem("discordId", data.discordId);
       localStorage.setItem("discordUsername", data.discordUsername);
+      localStorage.setItem("discordBotInstalled", needsBotInstall ? "0" : "1");
       window.location.replace("/repos");
     }
-  }, [code, error, data]);
+  }, [code, error, data, needsBotInstall]);
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <p className="text-gray-400">Discord連携中...</p>
+    <div className="min-h-screen flex items-center justify-center">
+      <p className="text-muted-foreground">Discord連携中...</p>
     </div>
   );
 }

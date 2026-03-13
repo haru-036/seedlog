@@ -104,6 +104,58 @@ X-GitHub-Event: push
 
 ## GitHub連携
 
+## Discord連携
+
+### `GET /api/auth/discord` ✅ 実装済み
+
+Discord OAuth 認証フローを開始する（サーバー追加画面はこの時点では表示しない）。
+
+**処理の流れ**
+
+1. CSRF 対策用のランダム state を生成し `discord_oauth_state` cookie にセット（httpOnly, Secure, SameSite=Lax, 5分）
+2. Discord の OAuth 認可画面へリダイレクト（scope: `identify guilds`）
+
+**レスポンス**
+
+- `302 Redirect` → Discord 認可画面
+
+---
+
+### `GET /api/auth/discord/install` ✅ 実装済み
+
+Discord Bot をサーバーに追加するための招待フローを開始する。
+
+**処理の流れ**
+
+1. Discord OAuth 認可画面へリダイレクト（scope: `bot`, permissions: `2048`）
+
+**レスポンス**
+
+- `302 Redirect` → Discord Bot 招待画面
+
+---
+
+### `GET /api/auth/discord/callback` ✅ 実装済み
+
+Discord OAuth コールバックを受け取り、ユーザー連携を確定する。
+
+**処理の流れ（抜粋）**
+
+1. CSRF state を検証
+2. code でアクセストークン交換
+3. Discord ユーザー情報を取得
+4. `github_user` Cookie に紐づくユーザーへ `discordId` を保存
+5. ユーザーが管理可能なサーバーに Bot が導入済みか判定
+6. フロントへリダイレクト
+
+**成功レスポンス**
+
+- `302 Redirect` → `${FRONTEND_URL}/auth/discord/callback?code=<one-time-code>&needsBotInstall=<0|1>`
+
+`needsBotInstall=1` の場合は、別途 `GET /api/auth/discord/install` で Bot 招待が必要。
+
+---
+
 ### `GET /api/auth/github` ✅ 実装済み
 
 GitHub OAuth 認証フローを開始する。
