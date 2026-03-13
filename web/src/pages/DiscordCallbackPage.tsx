@@ -16,6 +16,10 @@ export default function DiscordCallbackPage() {
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
   const needsBotInstall = params.get("needsBotInstall") === "1";
+  const dmDeliverableParam = params.get("dmDeliverable");
+  const dmReasonParam = params.get("dmReason");
+  const isValidDmDeliverable =
+    dmDeliverableParam === "0" || dmDeliverableParam === "1";
 
   const { data, error } = useSWR(
     code ? ["discord-token", code] : null,
@@ -35,9 +39,30 @@ export default function DiscordCallbackPage() {
       localStorage.setItem("discordId", data.discordId);
       localStorage.setItem("discordUsername", data.discordUsername);
       localStorage.setItem("discordBotInstalled", needsBotInstall ? "0" : "1");
+
+      if (isValidDmDeliverable) {
+        localStorage.setItem("discordDmDeliverable", dmDeliverableParam);
+        if (dmReasonParam !== null) {
+          localStorage.setItem("discordDmReason", dmReasonParam);
+        } else {
+          localStorage.removeItem("discordDmReason");
+        }
+      } else {
+        localStorage.removeItem("discordDmDeliverable");
+        localStorage.removeItem("discordDmReason");
+      }
+
       window.location.replace("/repos");
     }
-  }, [code, error, data, needsBotInstall]);
+  }, [
+    code,
+    error,
+    data,
+    needsBotInstall,
+    dmDeliverableParam,
+    dmReasonParam,
+    isValidDmDeliverable
+  ]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">
