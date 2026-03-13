@@ -325,6 +325,41 @@ error?: string
 
 ---
 
+### `DELETE /api/webhooks/unregister` ✅ 実装済み
+
+指定リポジトリの GitHub Webhook 登録を解除する。
+
+**Request**
+
+```typescript
+{
+  repo: string; // "owner/repo" 形式（認証ユーザーは github_user 署名済み Cookie から解決）
+}
+```
+
+**処理の流れ**
+
+1. `github_user` cookie から認証済みユーザーの GitHub login を解決
+2. KV に保存された対象 repo の webhook record を取得
+3. `hookId` がある場合のみ GitHub API `DELETE /repos/{owner}/{repo}/hooks/{hookId}` を呼び出し
+4. GitHub 側が 404 または `hookId` が null の場合も、KV 上の登録記録は削除する
+
+**Response** `200 OK`
+
+```typescript
+{
+  ok: true;
+}
+```
+
+**Error Responses**
+
+- `401 Unauthorized` — `github_user` cookie が未設定、または GitHub 未連携（githubAccessToken が未設定）
+- `404 Not Found` — ユーザーまたは対象 webhook record が見つからない
+- `502 Bad Gateway` — GitHub API エラー
+
+---
+
 ## Discord Interactions
 
 ### `POST /api/interactions` ✅ 実装済み

@@ -8,7 +8,13 @@ import type {
 import { apiFetch, API_BASE, fetcher } from "../lib/api";
 import { Lock } from "lucide-react";
 
-type WebhookStatus = "idle" | "loading" | "done" | "exists" | "error";
+type WebhookStatus =
+  | "idle"
+  | "loading"
+  | "unregistering"
+  | "done"
+  | "exists"
+  | "error";
 
 function RepoItem({
   repo,
@@ -47,6 +53,35 @@ function RepoItem({
     }
   }
 
+  async function unregisterWebhook() {
+    const shouldUnregister = window.confirm(
+      `${repo.fullName} の Webhook 登録を解除しますか？`
+    );
+    if (!shouldUnregister) return;
+
+    setStatus("unregistering");
+    try {
+      const res = await apiFetch("/api/webhooks/unregister", {
+        method: "DELETE",
+        body: JSON.stringify({ repo: repo.fullName })
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: { code: string; message: string };
+      };
+      if (!res.ok) {
+        console.error(data.error);
+        setStatus("error");
+        return;
+      }
+      setStatus("idle");
+      await mutate("/api/webhooks");
+    } catch (err) {
+      console.error("Webhook 解除に失敗しました:", err);
+      setStatus("error");
+    }
+  }
+
   return (
     <div className="flex items-center justify-between p-4 rounded-lg">
       <div className="min-w-0">
@@ -79,19 +114,41 @@ function RepoItem({
         {status === "loading" && (
           <span className="text-sm text-muted-foreground">登録中...</span>
         )}
-        {status === "done" && (
-          <span className="text-sm text-green-400">✅ 登録済み</span>
+        {status === "unregistering" && (
+          <span className="text-sm text-muted-foreground">解除中...</span>
         )}
-        {status === "exists" && (
-          <span className="text-sm text-yellow-400">⚠️ 既に登録済み</span>
+        {(status === "done" || status === "exists") && (
+          <div className="flex items-center gap-3">
+            <span
+              className={`text-sm ${status === "exists" ? "text-yellow-400" : "text-green-400"}`}
+            >
+              {status === "exists" ? "⚠️ 既に登録済み" : "✅ 登録済み"}
+            </span>
+            <button
+              onClick={unregisterWebhook}
+              className="text-sm bg-neutral-800 text-neutral-200 px-3 py-1.5 rounded hover:bg-neutral-700 transition-colors"
+            >
+              解除
+            </button>
+          </div>
         )}
         {status === "error" && (
-          <button
-            onClick={registerWebhook}
-            className="text-sm bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-500 transition-colors"
-          >
-            失敗（再試行）
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={registerWebhook}
+              className="text-sm bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-500 transition-colors"
+            >
+              登録を再試行
+            </button>
+            {isRegistered && (
+              <button
+                onClick={unregisterWebhook}
+                className="text-sm bg-neutral-800 text-neutral-200 px-3 py-1.5 rounded hover:bg-neutral-700 transition-colors"
+              >
+                解除
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
