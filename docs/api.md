@@ -148,9 +148,20 @@ Discord OAuth コールバックを受け取り、ユーザー連携を確定す
 
 **成功レスポンス**
 
-- `302 Redirect` → `${FRONTEND_URL}/auth/discord/callback?code=<one-time-code>&needsBotInstall=<0|1>`
+- `302 Redirect` → `${FRONTEND_URL}/auth/discord/callback?code=<one-time-code>&needsBotInstall=<0|1>&dmDeliverable=<0|1>&dmReason=<reason>`
 
 `needsBotInstall=1` の場合は、別途 `GET /api/auth/discord/install` で Bot 招待が必要。
+
+`dmDeliverable` は OAuth 完了時にテストDMを実送信して判定される。
+
+- `dmDeliverable=1` : 現時点でDM到達可能
+- `dmDeliverable=0` : 現時点でDM到達不可
+
+`dmReason` は以下のいずれか。
+
+- `ok` : 送達成功
+- `blocked_or_closed` : ユーザー側DM受信設定またはBotブロックの可能性
+- `unknown_error` : 一時障害など判別不能な失敗
 
 ---
 

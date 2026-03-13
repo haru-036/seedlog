@@ -16,6 +16,7 @@ import {
 } from "@seedlog/schema";
 import { oauthCodes, users } from "../db/schema";
 import { encryptToken } from "../lib/token-crypto";
+import { createDMChannel, sendDMMessage } from "../lib/discord";
 
 const authRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -108,6 +109,33 @@ async function hasBotInAnyManageableGuild(
     return true;
   } catch {
     return false;
+  }
+}
+
+type DiscordDmStatus = {
+  deliverable: boolean;
+  reason: "ok" | "blocked_or_closed" | "unknown_error";
+};
+
+async function testDmDeliverability(
+  botToken: string,
+  discordUserId: string
+): Promise<DiscordDmStatus> {
+  try {
+    const channelId = await createDMChannel(botToken, discordUserId);
+    await sendDMMessage(
+      botToken,
+      channelId,
+      "Seedlog: 接続テストDMです。今後の振り返り質問はこのDMに届きます。"
+    );
+    return { deliverable: true, reason: "ok" };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const isBlockedOrClosed = /Discord API error (400|403):/.test(msg);
+    return {
+      deliverable: false,
+      reason: isBlockedOrClosed ? "blocked_or_closed" : "unknown_error"
+    };
   }
 }
 
@@ -215,6 +243,10 @@ authRoute.get(
       c.env.DISCORD_BOT_TOKEN,
       c.env.APPLICATION_ID
     );
+    const dmStatus = await testDmDeliverability(
+      c.env.DISCORD_BOT_TOKEN,
+      discordUser.id
+    );
 
     const db = drizzle(c.env.DB);
     const onetimeCode = nanoid();
@@ -250,6 +282,11 @@ authRoute.get(
       "needsBotInstall",
       hasInstalledBot ? "0" : "1"
     );
+    redirectUrl.searchParams.set(
+      "dmDeliverable",
+      dmStatus.deliverable ? "1" : "0"
+    );
+    redirectUrl.searchParams.set("dmReason", dmStatus.reason);
     return c.redirect(redirectUrl.toString());
   }
 );
