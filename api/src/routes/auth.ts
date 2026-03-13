@@ -12,6 +12,8 @@ import { eq, lt } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import {
   discordCallbackQuerySchema,
+  discordDmStatusSchema,
+  type DiscordDmStatus,
   githubCallbackQuerySchema
 } from "@seedlog/schema";
 import { oauthCodes, users } from "../db/schema";
@@ -112,11 +114,6 @@ async function hasBotInAnyManageableGuild(
   }
 }
 
-type DiscordDmStatus = {
-  deliverable: boolean;
-  reason: "ok" | "blocked_or_closed" | "unknown_error";
-};
-
 async function testDmDeliverability(
   botToken: string,
   discordUserId: string
@@ -128,14 +125,14 @@ async function testDmDeliverability(
       channelId,
       "Seedlog: 接続テストDMです。今後の振り返り質問はこのDMに届きます。"
     );
-    return { deliverable: true, reason: "ok" };
+    return discordDmStatusSchema.parse({ deliverable: true, reason: "ok" });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const isBlockedOrClosed = /Discord API error (400|403):/.test(msg);
-    return {
+    return discordDmStatusSchema.parse({
       deliverable: false,
       reason: isBlockedOrClosed ? "blocked_or_closed" : "unknown_error"
-    };
+    });
   }
 }
 
@@ -243,10 +240,12 @@ authRoute.get(
       c.env.DISCORD_BOT_TOKEN,
       c.env.APPLICATION_ID
     );
-    const dmStatus = await testDmDeliverability(
-      c.env.DISCORD_BOT_TOKEN,
-      discordUser.id
-    );
+    const dmStatus = await Promise.race<DiscordDmStatus>([
+      testDmDeliverability(c.env.DISCORD_BOT_TOKEN, discordUser.id),
+      new Promise<DiscordDmStatus>((_, reject) => {
+        setTimeout(() => reject(new Error("DM_TEST_TIMEOUT")), 3000);
+      })
+    ]).catch(() => ({ deliverable: false, reason: "unknown_error" }));
 
     const db = drizzle(c.env.DB);
     const onetimeCode = nanoid();

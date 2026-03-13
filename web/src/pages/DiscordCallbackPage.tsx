@@ -16,8 +16,8 @@ export default function DiscordCallbackPage() {
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
   const needsBotInstall = params.get("needsBotInstall") === "1";
-  const dmDeliverable = params.get("dmDeliverable") === "1";
-  const dmReason = params.get("dmReason") ?? "unknown_error";
+  const dmDeliverableParam = params.get("dmDeliverable");
+  const dmReasonParam = params.get("dmReason");
 
   const { data, error } = useSWR(
     code ? ["discord-token", code] : null,
@@ -37,11 +37,25 @@ export default function DiscordCallbackPage() {
       localStorage.setItem("discordId", data.discordId);
       localStorage.setItem("discordUsername", data.discordUsername);
       localStorage.setItem("discordBotInstalled", needsBotInstall ? "0" : "1");
-      localStorage.setItem("discordDmDeliverable", dmDeliverable ? "1" : "0");
-      localStorage.setItem("discordDmReason", dmReason);
+
+      if (dmDeliverableParam !== null) {
+        localStorage.setItem(
+          "discordDmDeliverable",
+          dmDeliverableParam === "1" ? "1" : "0"
+        );
+      } else {
+        localStorage.removeItem("discordDmDeliverable");
+      }
+
+      if (dmReasonParam !== null) {
+        localStorage.setItem("discordDmReason", dmReasonParam);
+      } else {
+        localStorage.removeItem("discordDmReason");
+      }
+
       window.location.replace("/repos");
     }
-  }, [code, error, data, needsBotInstall, dmDeliverable, dmReason]);
+  }, [code, error, data, needsBotInstall, dmDeliverableParam, dmReasonParam]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">

@@ -90,7 +90,13 @@ export const discordTokenResponseSchema = z.object({
   discordUsername: z.string()
 });
 
+export const discordDmStatusSchema = z.object({
+  deliverable: z.boolean(),
+  reason: z.enum(["ok", "blocked_or_closed", "unknown_error"])
+});
+
 export type DiscordTokenResponse = z.infer<typeof discordTokenResponseSchema>;
+export type DiscordDmStatus = z.infer<typeof discordDmStatusSchema>;
 
 // ---- GitHub OAuth ----
 
