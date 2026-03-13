@@ -3,7 +3,9 @@ import { Hono } from "hono";
 import { getSignedCookie } from "hono/cookie";
 import { describeRoute, resolver, validator } from "hono-openapi";
 import {
+  webhookMutationResponseSchema,
   registerWebhookSchema,
+  unregisterWebhookSchema,
   webhooksListResponseSchema
 } from "@seedlog/schema";
 import { createDb } from "../db";
@@ -31,6 +33,16 @@ async function addWebhookRecord(
     records.push({ repo, hookId });
     await kv.put(`webhooks:${userId}`, JSON.stringify(records));
   }
+}
+
+async function removeWebhookRecord(
+  kv: KVNamespace,
+  userId: string,
+  repo: string
+): Promise<void> {
+  const records = await getWebhookRecords(kv, userId);
+  const nextRecords = records.filter((record) => record.repo !== repo);
+  await kv.put(`webhooks:${userId}`, JSON.stringify(nextRecords));
 }
 
 const webhooksRoute = new Hono<{ Bindings: CloudflareBindings }>();
@@ -241,6 +253,118 @@ webhooksRoute.post(
     const hook = (await res.json()) as { id: number };
     await addWebhookRecord(c.env.WEBHOOK_KV, user.id, repo, hook.id);
     return c.json({ ok: true, hookId: hook.id }, 201);
+  }
+);
+
+webhooksRoute.delete(
+  "/unregister",
+  describeRoute({
+    description:
+      "GitHub リポジトリの Webhook を解除する（要: github_user Cookie）",
+    tags: ["Webhooks"],
+    responses: {
+      200: {
+        description: "Webhook 解除成功",
+        content: {
+          "application/json": {
+            schema: resolver(webhookMutationResponseSchema)
+          }
+        }
+      },
+      401: { description: "GitHub認証が必要です" },
+      404: { description: "ユーザーまたは Webhook が見つかりません" },
+      502: { description: "GitHub API エラー" }
+    }
+  }),
+  validator("json", unregisterWebhookSchema),
+  async (c) => {
+    const githubLogin = await getSignedCookie(
+      c,
+      c.env.COOKIE_SECRET,
+      "github_user"
+    );
+    if (!githubLogin) {
+      return c.json(
+        { error: { code: "UNAUTHORIZED", message: "GitHub認証が必要です" } },
+        401
+      );
+    }
+
+    const { repo } = c.req.valid("json");
+    const db = createDb(c.env.DB);
+    const user = await db
+      .select()
+      .from(users)
+      .where(eq(users.githubLogin, githubLogin))
+      .get();
+
+    if (!user) {
+      return c.json(
+        { error: { code: "NOT_FOUND", message: "ユーザーが見つかりません" } },
+        404
+      );
+    }
+    if (!user.githubAccessToken) {
+      return c.json(
+        {
+          error: {
+            code: "UNAUTHORIZED",
+            message: "GitHub連携が完了していません"
+          }
+        },
+        401
+      );
+    }
+
+    const records = await getWebhookRecords(c.env.WEBHOOK_KV, user.id);
+    const record = records.find((item) => item.repo === repo);
+    if (!record) {
+      return c.json(
+        {
+          error: {
+            code: "NOT_FOUND",
+            message: "Webhook が登録されていません"
+          }
+        },
+        404
+      );
+    }
+
+    if (record.hookId !== null) {
+      const accessToken = await decryptToken(
+        user.githubAccessToken,
+        c.env.GITHUB_TOKEN_ENCRYPTION_KEY
+      );
+      const [owner, repoName] = repo.split("/");
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repoName}/hooks/${record.hookId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: "application/vnd.github+json",
+            "User-Agent": "seedlog-api"
+          }
+        }
+      );
+
+      if (!res.ok && res.status !== 404) {
+        const text = await res.text();
+        console.error("GitHub webhook 解除エラー:", text);
+        return c.json(
+          {
+            error: {
+              code: "GITHUB_API_ERROR",
+              message: "webhook解除に失敗しました"
+            }
+          },
+          502
+        );
+      }
+    }
+
+    await removeWebhookRecord(c.env.WEBHOOK_KV, user.id, repo);
+    return c.json({ ok: true });
   }
 );
 
