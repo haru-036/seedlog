@@ -3,7 +3,8 @@ import { Hono } from "hono";
 import { nanoid } from "nanoid";
 import { discordInteractionSchema } from "@seedlog/schema";
 import { createDb } from "../db";
-import { logs, questions, users } from "../db/schema";
+import { episodes, logs, questions, users } from "../db/schema";
+import { generateEpisode } from "../lib/gemini";
 
 const interactionsRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -53,6 +54,25 @@ const RESPONSE_TYPE = {
   CHANNEL_MESSAGE_WITH_SOURCE: 4,
   MODAL: 9
 } as const;
+
+const DISCORD_MESSAGE_MAX_LENGTH = 2000;
+const EPHEMERAL_FLAG = 64;
+
+function ephemeralMessage(content: string) {
+  return {
+    type: RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
+    data: { content, flags: EPHEMERAL_FLAG }
+  };
+}
+
+function truncateForDiscordMessage(content: string): string {
+  if (content.length <= DISCORD_MESSAGE_MAX_LENGTH) {
+    return content;
+  }
+
+  const suffix = "\n\n...（文字数上限のため一部省略しました）";
+  return content.slice(0, DISCORD_MESSAGE_MAX_LENGTH - suffix.length) + suffix;
+}
 
 const REPLY_MODAL_COMPONENTS = (customId: string) => ({
   type: RESPONSE_TYPE.MODAL,
@@ -156,6 +176,68 @@ interactionsRoute.post("/", async (c) => {
     if (interaction.data?.name === "log") {
       return c.json(LOG_MODAL);
     }
+
+    if (interaction.data?.name === "episode") {
+      const discordUserId = interaction.member?.user.id ?? interaction.user?.id;
+      if (!discordUserId) {
+        return c.json(ephemeralMessage("ユーザー情報が取得できませんでした。"));
+      }
+
+      const prompt =
+        interaction.data.options
+          ?.find((option) => option.name === "prompt")
+          ?.value?.trim() ?? "";
+      if (!prompt) {
+        return c.json(
+          ephemeralMessage(
+            "promptが空です。`/episode prompt:今週の成長をまとめて` のように入力してください。"
+          )
+        );
+      }
+
+      const db = createDb(c.env.DB);
+      const user = await db
+        .select()
+        .from(users)
+        .where(eq(users.discordId, discordUserId))
+        .get();
+      if (!user) {
+        return c.json(
+          ephemeralMessage(
+            "ユーザーが見つかりませんでした。まず `/register` でユーザー登録してください。"
+          )
+        );
+      }
+
+      const userLogs = await db
+        .select({ content: logs.content, createdAt: logs.createdAt })
+        .from(logs)
+        .where(eq(logs.userId, user.id))
+        .orderBy(logs.createdAt, logs.id)
+        .all();
+      if (userLogs.length === 0) {
+        return c.json(
+          ephemeralMessage(
+            "ログがまだありません。`/log` でログを記録してからお試しください。"
+          )
+        );
+      }
+
+      const episode = await generateEpisode(
+        c.env.GEMINI_API_KEY,
+        userLogs.map((log) => log.content),
+        prompt
+      );
+
+      await db.insert(episodes).values({
+        id: nanoid(),
+        userId: user.id,
+        prompt,
+        content: episode
+      });
+
+      return c.json(ephemeralMessage(truncateForDiscordMessage(episode)));
+    }
   }
 
   // ボタンクリック → 振り返りモーダルを表示
@@ -171,10 +253,7 @@ interactionsRoute.post("/", async (c) => {
   if (interaction.type === INTERACTION_TYPE.MODAL_SUBMIT) {
     const discordUserId = interaction.member?.user.id ?? interaction.user?.id;
     if (!discordUserId) {
-      return c.json({
-        type: RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: { content: "ユーザー情報が取得できませんでした。", flags: 64 }
-      });
+      return c.json(ephemeralMessage("ユーザー情報が取得できませんでした。"));
     }
 
     const content =
@@ -183,10 +262,7 @@ interactionsRoute.post("/", async (c) => {
         .find((comp) => comp.type === 4)?.value ?? "";
 
     if (!content.trim()) {
-      return c.json({
-        type: RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: { content: "内容を入力してください。", flags: 64 }
-      });
+      return c.json(ephemeralMessage("内容を入力してください。"));
     }
 
     const db = createDb(c.env.DB);
@@ -196,14 +272,11 @@ interactionsRoute.post("/", async (c) => {
       .where(eq(users.discordId, discordUserId))
       .get();
     if (!user) {
-      return c.json({
-        type: RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          content:
-            "ユーザーが見つかりませんでした。まず `/register` でユーザー登録してください。",
-          flags: 64
-        }
-      });
+      return c.json(
+        ephemeralMessage(
+          "ユーザーが見つかりませんでした。まず `/register` でユーザー登録してください。"
+        )
+      );
     }
 
     const customId = interaction.data?.custom_id ?? "";
@@ -255,7 +328,7 @@ interactionsRoute.post("/", async (c) => {
         type: RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
           content: "回答を記録しました！振り返り、お疲れさまでした 🌱",
-          flags: 64
+          flags: EPHEMERAL_FLAG
         }
       });
     }
@@ -282,21 +355,15 @@ interactionsRoute.post("/", async (c) => {
         type: RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
           content: "ログを記録しました！今日も成長、お疲れさまでした 🌱",
-          flags: 64
+          flags: EPHEMERAL_FLAG
         }
       });
     }
 
-    return c.json({
-      type: RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
-      data: { content: "不明な操作です。", flags: 64 }
-    });
+    return c.json(ephemeralMessage("不明な操作です。"));
   }
 
-  return c.json({
-    type: RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
-    data: { content: "対応していないInteractionです。", flags: 64 }
-  });
+  return c.json(ephemeralMessage("対応していないInteractionです。"));
 });
 
 export { interactionsRoute };

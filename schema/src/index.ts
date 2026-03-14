@@ -60,6 +60,15 @@ export const discordInteractionSchema = z.object({
     .object({
       custom_id: z.string().optional(),
       name: z.string().optional(),
+      options: z
+        .array(
+          z.object({
+            name: z.string(),
+            type: z.number().int(),
+            value: z.string().optional()
+          })
+        )
+        .optional(),
       components: z
         .array(
           z.object({
