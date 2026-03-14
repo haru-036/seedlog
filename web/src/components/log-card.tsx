@@ -58,7 +58,7 @@ export function LogCard({ log, onDeleted }: LogCardProps) {
       case "discord_reply":
         return "質問に回答";
       default:
-        return "手動入力";
+        return "Webで記録";
     }
   };
 
