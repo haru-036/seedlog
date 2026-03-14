@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { LogCard } from "./log-card";
 import { FileText } from "lucide-react";
 import type { LogResponse } from "@seedlog/schema";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -14,8 +14,17 @@ import {
 
 interface LogListProps {
   logs: LogResponse[];
+  total: number;
+  hasMore: boolean;
+  page: number;
+  pageSize: number;
+  selectedSource: SourceFilter;
+  onSourceChange: (value: SourceFilter) => void;
+  onPageChange: (page: number) => void;
   onLogDeleted?: (id: string) => void;
 }
+
+type SourceFilter = "all" | "web" | "discord_command" | "discord_reply";
 
 const SOURCES = [
   {
@@ -48,25 +57,26 @@ function formatDateHeader(dateString: string): string {
   });
 }
 
-export function LogList({ logs, onLogDeleted }: LogListProps) {
-  const [selectedSource, setSelectedSource] = useState<string | null>(null);
-
-  const sourceCounts = logs.reduce<Record<string, number>>((counts, log) => {
-    counts[log.source] = (counts[log.source] ?? 0) + 1;
-    return counts;
-  }, {});
-
-  const filteredLogs = selectedSource
-    ? logs.filter((log) => log.source === selectedSource)
-    : logs;
-
-  const selectedSourceLabel = SOURCES.find(
-    (source) => source.value === selectedSource
-  )?.label;
+export function LogList({
+  logs,
+  total,
+  hasMore,
+  page,
+  pageSize,
+  selectedSource,
+  onSourceChange,
+  onPageChange,
+  onLogDeleted
+}: LogListProps) {
+  const selectedSourceLabel =
+    selectedSource === "all"
+      ? undefined
+      : SOURCES.find((source) => source.value === selectedSource)?.label;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   // APIは新しい順で返ってくる前提で日付ごとにグループ化
   const dateGroups: { key: string; label: string; logs: LogResponse[] }[] = [];
-  for (const log of filteredLogs) {
+  for (const log of logs) {
     const key = getDateKey(log.createdAt);
     const last = dateGroups[dateGroups.length - 1];
     if (last?.key === key) {
@@ -84,22 +94,25 @@ export function LogList({ logs, onLogDeleted }: LogListProps) {
     <div className="flex flex-col gap-5 px-2">
       {/* フィルタバー */}
       <div className="flex justify-between items-center gap-2">
-        <h2 className="font-semibold text-foreground">ログ一覧</h2>
+        <div className="space-y-1">
+          <h2 className="font-semibold text-foreground">ログ一覧</h2>
+          <p className="text-xs text-muted-foreground">
+            {logs.length}件表示 / 全{total}件
+          </p>
+        </div>
 
         <Select
-          value={selectedSource ?? "all"}
-          onValueChange={(value) =>
-            setSelectedSource(value === "all" ? null : value)
-          }
+          value={selectedSource}
+          onValueChange={(value) => onSourceChange(value as SourceFilter)}
         >
-          <SelectTrigger>
+          <SelectTrigger className="min-w-36">
             <SelectValue placeholder="表示ソースを選択" />
           </SelectTrigger>
           <SelectContent align="end" side="bottom">
-            <SelectItem value="all">すべて ({logs.length})</SelectItem>
+            <SelectItem value="all">すべて</SelectItem>
             {SOURCES.map((source) => (
               <SelectItem key={source.value} value={source.value}>
-                {source.label} ({sourceCounts[source.value] ?? 0})
+                {source.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -107,7 +120,7 @@ export function LogList({ logs, onLogDeleted }: LogListProps) {
       </div>
 
       {/* タイムライン */}
-      {filteredLogs.length === 0 ? (
+      {logs.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/15 px-6 py-14 text-center text-muted-foreground">
           <FileText className="mb-4 h-12 w-12 opacity-50" />
           <p className="text-base font-medium text-foreground">
@@ -146,6 +159,30 @@ export function LogList({ logs, onLogDeleted }: LogListProps) {
           ))}
         </div>
       )}
+
+      <div className="flex items-center justify-between gap-2 border-t border-border/50 pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          前へ
+        </Button>
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {page} / {totalPages}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={!hasMore}
+          onClick={() => onPageChange(page + 1)}
+        >
+          次へ
+        </Button>
+      </div>
     </div>
   );
 }
