@@ -158,7 +158,7 @@ function RepoItem({
 export default function ReposPage() {
   const [githubLogin, setGithubLogin] = useState<string | null>(null);
   const [discordUsername, setDiscordUsername] = useState<string | null>(null);
-  const [discordBotInstallFlag, setDiscordBotInstallFlag] = useState<
+  const [_discordBotInstallFlag, setDiscordBotInstallFlag] = useState<
     string | null
   >(null);
   const [discordDmDeliverable, setDiscordDmDeliverable] = useState<
@@ -221,7 +221,7 @@ export default function ReposPage() {
           >
             {discordUsername ? "Discord 再連携" : "Discord 連携"}
           </a>
-          {discordUsername && discordBotInstallFlag === "0" && (
+          {discordUsername && (
             <a
               href={`${API_BASE}/api/auth/discord/install`}
               className="text-sm bg-emerald-600 text-white px-3 py-1.5 rounded hover:bg-emerald-500 transition-colors"
