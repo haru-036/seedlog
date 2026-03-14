@@ -9,6 +9,9 @@ import { LogList } from "@/components/log-list";
 import { AIPanel } from "@/components/ai-panel";
 import { fetchCurrentUser, fetcher } from "@/lib/api";
 import { RepoSelectorPanel } from "@/components/repo-selector-panel";
+import { MOCK_LOGS_RESPONSE } from "@/lib/mock-data";
+
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 
 export function DashboardClient() {
   const { data: currentUser } = useSWR("/api/auth/me", fetchCurrentUser);
@@ -20,11 +23,16 @@ export function DashboardClient() {
   }, [currentUser]);
 
   // バックエンドの /api/logs からデータを取得
-  const { data } = useSWR<LogsListResponse>("/api/logs", fetcher, {
-    onError: (err) => console.warn("API fetch failed:", err.message)
-  });
+  const { data } = useSWR<LogsListResponse>(
+    USE_MOCK ? null : "/api/logs",
+    fetcher,
+    {
+      onError: (err) => console.warn("API fetch failed:", err.message),
+      fallbackData: USE_MOCK ? MOCK_LOGS_RESPONSE : undefined
+    }
+  );
 
-  const logs = data?.logs ?? [];
+  const logs = USE_MOCK ? MOCK_LOGS_RESPONSE.logs : (data?.logs ?? []);
 
   const [prefillContent, setPrefillContent] = useState<string>("");
 
@@ -35,6 +43,7 @@ export function DashboardClient() {
 
   const handleLogDeleted = useCallback(
     (deletedId: string) => {
+      if (USE_MOCK) return;
       if (data) {
         mutate(
           "/api/logs",
@@ -53,9 +62,9 @@ export function DashboardClient() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <DashboardHeader />
-      <main className="max-w-6xl mx-auto px-4 py-6 md:py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-          <div className="lg:col-span-2 flex flex-col gap-6">
+      <main className="max-w-7xl mx-auto px-4 py-6 md:py-8">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
+          <div className="flex flex-col gap-6 lg:col-span-8">
             <div>
               <h1 className="text-2xl font-bold mb-1">開発ログ</h1>
               <p className="text-muted-foreground text-sm">
@@ -66,11 +75,11 @@ export function DashboardClient() {
               onLogCreated={handleLogCreated}
               prefillContent={prefillContent}
             />
-            <LogList logs={logs} onLogDeleted={handleLogDeleted} />
-          </div>
-          <div className="lg:col-span-1 space-y-4 lg:space-y-6">
-            <RepoSelectorPanel />
             <AIPanel logs={logs} />
+          </div>
+          <div className="space-y-4 lg:col-span-4 lg:space-y-6">
+            <RepoSelectorPanel />
+            <LogList logs={logs} onLogDeleted={handleLogDeleted} />
           </div>
         </div>
       </main>
