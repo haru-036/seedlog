@@ -1,66 +1,81 @@
-import { Button } from '@/components/ui/button'
-import { FileText, LogOut } from 'lucide-react'
-import { NotificationPanel } from './notification-panel'
+import { useEffect, useState } from "react";
+import { API_BASE } from "../lib/api";
 
 // 通知データの型定義
-interface Notification {
-  id: string
-  type: string
-  title: string
-  message: string
-  metadata: any
-  is_read: boolean
-  created_at: string
-}
+export function DashboardHeader() {
+  const [githubLogin, setGithubLogin] = useState<string | null>(null);
+  const [discordUsername, setDiscordUsername] = useState<string | null>(null);
+  const [_discordBotInstallFlag, setDiscordBotInstallFlag] = useState<
+    string | null
+  >(null);
+  const [discordDmDeliverable, setDiscordDmDeliverable] = useState<
+    string | null
+  >(null);
+  const [discordDmReason, setDiscordDmReason] = useState<string | null>(null);
 
-interface DashboardHeaderProps {
-  displayName?: string | null
-  onCreateLogFromPush?: (notification: Notification) => void
-}
-
-export function DashboardHeader({ displayName, onCreateLogFromPush }: DashboardHeaderProps) {
-  const handleSignOut = () => {
-    // ローカルストレージに保存されている認証情報（ユーザー情報）をクリア
-    localStorage.removeItem('githubLogin')
-    localStorage.removeItem('discordId')
-    localStorage.removeItem('discordUsername')
-    
-    // トップページ（ログイン画面）へリダイレクト
-    window.location.replace('/') 
-  }
+  useEffect(() => {
+    setGithubLogin(localStorage.getItem("githubLogin"));
+    const username = localStorage.getItem("discordUsername");
+    setDiscordUsername(username);
+    setDiscordBotInstallFlag(localStorage.getItem("discordBotInstalled"));
+    setDiscordDmDeliverable(localStorage.getItem("discordDmDeliverable"));
+    setDiscordDmReason(localStorage.getItem("discordDmReason"));
+  }, []);
 
   return (
-    <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        
-        {/* 左側：ロゴとアプリ名 */}
-        <div className="flex items-center gap-2">
-          <FileText className="h-6 w-6 text-primary" />
-          <span className="text-lg font-bold">Seedlog</span>
-        </div>
-
-        {/* 右側：ユーザー名、通知、ログアウト */}
-        <div className="flex items-center gap-3">
-          {displayName && (
-            <span className="text-sm text-muted-foreground hidden sm:block">
-              {displayName}
-            </span>
-          )}
-          
-          {/* GitHub Push などの通知パネル */}
-          <NotificationPanel onCreateLogFromPush={onCreateLogFromPush} />
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSignOut}
-          >
-            <LogOut className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">ログアウト</span>
-          </Button>
-        </div>
-
-      </div>
-    </header>
+      <>
+          <header className="border-b border-neutral-800 px-6 py-4 flex items-center justify-between">
+            <h1 className="text-xl font-bold">🌱 Seedlog</h1>
+            <div className="flex items-center gap-4">
+              {githubLogin && (
+                <span className="text-sm text-muted-foreground">
+                  @{githubLogin}
+                </span>
+              )}
+              {discordUsername ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    Discord: {discordUsername}
+                  </span>
+                  {discordDmDeliverable === "1" && (
+                    <span className="text-xs bg-emerald-900 text-emerald-300 px-2 py-0.5 rounded">
+                      DM受信可能
+                    </span>
+                  )}
+                  {discordDmDeliverable === "0" && (
+                    <span className="text-xs bg-red-900 text-red-300 px-2 py-0.5 rounded">
+                      DM受信不可
+                    </span>
+                  )}
+                </div>
+              ) : null}
+              <a
+                href={`${API_BASE}/api/auth/discord`}
+                className="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded hover:bg-indigo-500 transition-colors"
+              >
+                {discordUsername ? "Discord 再連携" : "Discord 連携"}
+              </a>
+              {discordUsername && (
+                <a
+                  href={`${API_BASE}/api/auth/discord/install`}
+                  className="text-sm bg-emerald-600 text-white px-3 py-1.5 rounded hover:bg-emerald-500 transition-colors"
+                >
+                  Bot をサーバーに追加
+                </a>
+              )}
+            </div>
+          </header>
+        {discordUsername && discordDmDeliverable === "0" && (
+          <div className="max-w-2xl mx-auto px-6 pt-4">
+            <p className="text-sm text-red-300">
+              DMを送信できませんでした（
+              {discordDmReason === "blocked_or_closed"
+                ? "DM受信設定またはBotブロック"
+                : "不明なエラー"}
+              ）。Discord 再連携で再チェックできます。
+            </p>
+          </div>
+        )}
+      </>
   )
 }
