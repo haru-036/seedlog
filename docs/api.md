@@ -175,7 +175,7 @@ GitHub OAuth 認証フローを開始する。
 **処理の流れ**
 
 1. CSRF 対策用のランダム state を生成し `github_oauth_state` cookie にセット（httpOnly, Secure, SameSite=Lax, 5分）
-2. GitHub の OAuth 認可画面へリダイレクト（scope: `admin:repo_hook read:user`）
+2. GitHub の OAuth 認可画面へリダイレクト（scope: `repo read:org admin:repo_hook read:user`）
 
 **必要な環境変数**
 
@@ -284,6 +284,7 @@ error?: string
 **取得条件**
 
 - affiliation=owner,collaborator,organization_member（オーナー・コラボレータ・組織所属リポジトリ）
+- organisation リポジトリは `permissions.admin=true`（認証ユーザーが admin 権限を持つもの）のみを返却
 - sort=updated（最終更新順）
 - `query` 指定時は `name` / `fullName` / `description` を対象にサーバー側で部分一致検索し、検索結果に対して `page` / `per_page` を適用
 - `query` 指定時の走査は最大 5000 件（100件 × 50ページ）。上限に達しても続きがある場合、`incomplete: true` が返る
