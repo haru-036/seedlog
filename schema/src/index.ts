@@ -152,6 +152,24 @@ export const logSourceSchema = z.enum([
   "web"
 ]);
 
+export const createLogSourceSchema = z.enum(["discord_command", "web"]);
+
+export const createLogRequestSchema = z.object({
+  content: z
+    .string()
+    .trim()
+    .min(1, "contentは必須です")
+    .max(2000, "contentは2000文字以内で入力してください"),
+  source: createLogSourceSchema.default("web"),
+  repo: z
+    .string()
+    .trim()
+    .regex(/^[^/]+\/[^/]+$/, "repo は owner/repo 形式で指定してください")
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null)
+});
+
 export const logResponseSchema = z.object({
   id: z.string(),
   userId: z.string(),
@@ -170,6 +188,7 @@ export const logsQuerySchema = z.object({
 
 export type LogResponse = z.infer<typeof logResponseSchema>;
 export type LogsQuery = z.infer<typeof logsQuerySchema>;
+export type CreateLogRequest = z.infer<typeof createLogRequestSchema>;
 
 export const logsListResponseSchema = z.object({
   logs: z.array(logResponseSchema),
