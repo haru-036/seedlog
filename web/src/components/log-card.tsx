@@ -79,7 +79,7 @@ export function LogCard({ log, onDeleted }: LogCardProps) {
 
   return (
     <Card className="group relative border-border/60 bg-card/95 shadow-sm">
-      <CardHeader className="gap-3 border-b border-border/60 pb-4">
+      <CardHeader className="gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             {sourceLabel && (
@@ -129,8 +129,8 @@ export function LogCard({ log, onDeleted }: LogCardProps) {
         </div>
       </CardHeader>
 
-      <CardContent className="pt-5">
-        <p className="whitespace-pre-wrap wrap-break-word text-[15px] leading-7 text-foreground">
+      <CardContent>
+        <p className="whitespace-pre-wrap wrap-break-word text-base leading-normal text-foreground">
           {normalizedContent || "内容がありません"}
         </p>
       </CardContent>
