@@ -6,7 +6,7 @@ export default function GitHubCallbackPage() {
     const githubLogin = params.get("githubLogin");
     if (githubLogin) {
       localStorage.setItem("githubLogin", githubLogin);
-      window.location.replace("/repos");
+      window.location.replace("/dashboard");
     } else {
       window.location.replace("/auth/error?reason=oauth_error");
     }

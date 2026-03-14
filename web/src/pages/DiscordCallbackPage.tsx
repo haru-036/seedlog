@@ -52,7 +52,7 @@ export default function DiscordCallbackPage() {
         localStorage.removeItem("discordDmReason");
       }
 
-      window.location.replace("/repos");
+      window.location.replace("/dashboard");
     }
   }, [
     code,
