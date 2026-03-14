@@ -126,7 +126,7 @@ export function LogCard({ log, onDeleted }: LogCardProps) {
           <button
             type="button"
             onClick={() => setShowConfirm(true)}
-            className="mt-0.5 shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+            className="mt-0.5 shrink-0 rounded p-1 text-muted-foreground opacity-100 transition-opacity hover:text-destructive md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 focus-visible:opacity-100"
             aria-label="削除"
           >
             <Trash2 className="h-3.5 w-3.5" />
