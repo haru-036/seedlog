@@ -1,7 +1,9 @@
 import { and, count, eq } from "drizzle-orm";
 import { Hono } from "hono";
+import { nanoid } from "nanoid";
 import { describeRoute, resolver, validator } from "hono-openapi";
 import {
+  createLogRequestSchema,
   logResponseSchema,
   logsListResponseSchema,
   logsQuerySchema
@@ -77,6 +79,66 @@ logsRoute.get(
       total,
       hasMore: offset + rows.length < total
     });
+  }
+);
+
+logsRoute.post(
+  "/",
+  describeRoute({
+    description: "ログを手動で追加する",
+    tags: ["Logs"],
+    responses: {
+      201: {
+        description: "作成されたログ",
+        content: {
+          "application/json": { schema: resolver(logResponseSchema) }
+        }
+      },
+      401: { description: "未認証" }
+    }
+  }),
+  validator("json", createLogRequestSchema),
+  async (c) => {
+    const currentUser = await resolveCurrentUser(c);
+
+    if (!currentUser.user) {
+      c.header("Cache-Control", "private, no-store");
+      c.header("Vary", "Cookie");
+      return c.json(
+        { error: { code: "UNAUTHORIZED", message: "認証が必要です" } },
+        401
+      );
+    }
+
+    const { content, source, repo } = c.req.valid("json");
+    const db = createDb(c.env.DB);
+    const id = nanoid();
+    const createdAt = new Date();
+
+    await db.insert(logs).values({
+      id,
+      userId: currentUser.user.id,
+      questionId: null,
+      repo,
+      content,
+      source,
+      createdAt
+    });
+
+    c.header("Cache-Control", "private, no-store");
+    c.header("Vary", "Cookie");
+    return c.json(
+      logResponseSchema.parse({
+        id,
+        userId: currentUser.user.id,
+        questionId: null,
+        repo,
+        content,
+        source,
+        createdAt: createdAt.toISOString()
+      }),
+      201
+    );
   }
 );
 

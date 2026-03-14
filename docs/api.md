@@ -460,7 +460,7 @@ offset?: number
 }
 ```
 
-### `POST /api/logs` 🔒
+### `POST /api/logs` ✅ 実装済み 🔒
 
 手動でログを追加（WebアプリとDiscordコマンド共通）。
 
@@ -468,11 +468,30 @@ offset?: number
 
 ```typescript
 {
-  userId: string;
   content: string;
-  source: "discord_command" | "web";
+  source?: "discord_command" | "web"; // 省略時は "web"
+  repo?: string | null; // "owner/repo" 形式 or null
 }
 ```
+
+**Response** `201 Created`
+
+```typescript
+{
+  id: string;
+  userId: string;
+  questionId: null;
+  repo: string | null;
+  content: string;
+  source: "discord_command" | "web";
+  createdAt: string; // ISO 8601
+}
+```
+
+**Error Responses**
+
+- `401 Unauthorized` — 未認証
+- `400 Bad Request` — 入力バリデーションエラー（例: repo が owner/repo 形式ではない）
 
 ### `GET /api/logs/:id` 🔒
 

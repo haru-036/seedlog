@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import useSWR from "swr";
+import type { Repo, ReposResponse } from "@seedlog/schema";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, X } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, fetcher } from "@/lib/api";
 
 interface LogFormProps {
   onLogCreated?: () => void;
@@ -15,8 +17,14 @@ interface LogFormProps {
 export function LogForm({ onLogCreated, prefillContent }: LogFormProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [content, setContent] = useState("");
+  const [repo, setRepo] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const { data: reposData } = useSWR<ReposResponse>(
+    isOpen ? "/api/repos?per_page=100" : null,
+    fetcher
+  );
+  const repos: Repo[] = reposData?.repos ?? [];
 
   useEffect(() => {
     if (prefillContent) {
@@ -36,7 +44,8 @@ export function LogForm({ onLogCreated, prefillContent }: LogFormProps) {
         method: "POST",
         body: JSON.stringify({
           content,
-          source: "web"
+          source: "web",
+          repo: repo === "" ? null : repo
         })
       });
 
@@ -47,6 +56,7 @@ export function LogForm({ onLogCreated, prefillContent }: LogFormProps) {
 
       setIsOpen(false);
       setContent("");
+      setRepo("");
       onLogCreated?.();
     } catch (err: any) {
       setError(err.message);
@@ -85,6 +95,30 @@ export function LogForm({ onLogCreated, prefillContent }: LogFormProps) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="repo" className="text-sm font-medium">
+              リポジトリ（任意）
+            </label>
+            <select
+              id="repo"
+              name="repo"
+              value={repo}
+              onChange={(e) => setRepo(e.target.value)}
+              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden"
+            >
+              <option value="">リポジトリなし</option>
+              {repos.map((item) => (
+                <option key={item.fullName} value={item.fullName}>
+                  {item.fullName}
+                </option>
+              ))}
+            </select>
+            {reposData?.incomplete && (
+              <p className="text-muted-foreground text-xs">
+                候補は一部のみ表示されています（検索条件で絞り込んでください）
+              </p>
+            )}
+          </div>
           <Textarea
             name="content"
             placeholder="今日学んだこと、詰まったエラー、解決策などを自由に書いてください。"
