@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,6 +11,9 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Lightbulb, FileText, TrendingUp, Sparkles } from "lucide-react";
 import type { LogResponse } from "@seedlog/schema";
 import { apiFetch } from "@/lib/api";
@@ -49,6 +52,13 @@ interface AIPanelProps {
   logs: LogResponse[];
 }
 
+// 各タブ用のデフォルトプロンプトの定義
+const DEFAULT_PROMPTS = {
+  lt: "最近のログをもとに、初心者向けに5分程度で話せるLTの構成を提案してください。\n\n**条件:**\n- 専門用語はなるべく避ける\n- 具体的なコード例も提案に含める",
+  es: "チーム開発で直面した課題と、それをどう乗り越えたかに焦点を当ててES用の文章を作成してください。\n\n**条件:**\n- STAR法（状況・課題・行動・結果）に沿って書く\n- 400字程度にまとめる",
+  growth: "直近のログから技術的な挑戦と、次に学ぶべきおすすめの技術スタックを中心に成長を分析してください。"
+};
+
 export function AIPanel({ logs }: AIPanelProps) {
   const [activeTab, setActiveTab] = useState<AIType>("lt");
   const [loading, setLoading] = useState(false);
@@ -58,6 +68,12 @@ export function AIPanel({ logs }: AIPanelProps) {
     experiences: ESExperience[];
   } | null>(null);
   const [growthResult, setGrowthResult] = useState<GrowthAnalysis | null>(null);
+  const [customPrompt, setCustomPrompt] = useState(DEFAULT_PROMPTS["lt"]); // プロンプトのState
+
+  // タブが切り替わったタイミングで、対応するプロンプト例を入力欄にセットする
+  useEffect(() => {
+    setCustomPrompt(DEFAULT_PROMPTS[activeTab]);
+  }, [activeTab]);
 
   const generateContent = async (type: AIType) => {
     // ログが0件の場合はAPIを叩かずにエラーを出す
@@ -161,6 +177,19 @@ export function AIPanel({ logs }: AIPanelProps) {
             </TabsTrigger>
           </TabsList>
 
+          {/* プロンプト入力エリア */}
+          <div className="mb-6 space-y-2">
+            <label className="text-sm font-medium text-foreground">
+              AIへの指示
+            </label>
+            <Textarea
+              value={customPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              placeholder="AIへの指示を入力してください..."
+              className="min-h-100px resize-y font-mono text-sm leading-relaxed"
+            />
+          </div>
+
           <TabsContent value="lt" className="space-y-4">
             <div className="text-sm text-muted-foreground">
               ログからLTのネタになりそうなトピックを提案します。
@@ -188,8 +217,10 @@ export function AIPanel({ logs }: AIPanelProps) {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="text-sm space-y-2">
-                      <p>{topic.summary}</p>
-                      <div>
+                      <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{topic.summary}</ReactMarkdown>
+                      </div>
+                      <div className="pt-2 border-t border-border mt-2">
                         <span className="font-medium">ポイント:</span>
                         <ul className="list-disc list-inside mt-1 text-muted-foreground">
                           {topic.keyPoints.map((point, j) => (
@@ -257,7 +288,9 @@ export function AIPanel({ logs }: AIPanelProps) {
                       </div>
                       <div className="pt-2 border-t border-border">
                         <span className="font-medium">ES用文章:</span>
-                        <p className="mt-1 whitespace-pre-wrap">{exp.esText}</p>
+                        <div className="mt-2 prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{exp.esText}</ReactMarkdown>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -289,7 +322,11 @@ export function AIPanel({ logs }: AIPanelProps) {
                     <CardTitle className="text-base">成長サマリー</CardTitle>
                   </CardHeader>
                   <CardContent className="text-sm">
-                    <p>{growthResult.summary}</p>
+                    <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {growthResult.summary}
+                      </ReactMarkdown>
+                    </div>
                   </CardContent>
                 </Card>
 
