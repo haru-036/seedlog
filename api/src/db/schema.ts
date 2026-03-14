@@ -42,11 +42,24 @@ export const logs = sqliteTable("logs", {
     .notNull()
     .references(() => users.id),
   questionId: text("question_id").references(() => questions.id), // null if manually added
+  repo: text("repo"), // owner/repo
   content: text("content").notNull(),
   source: text("source")
     .$type<"github_push" | "discord_command" | "discord_reply" | "web">()
     .notNull()
     .default("web"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date())
+});
+
+export const episodes = sqliteTable("episodes", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  prompt: text("prompt").notNull(),
+  content: text("content").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date())

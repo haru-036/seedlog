@@ -1,10 +1,12 @@
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
+import { nanoid } from "nanoid";
 import { describeRoute, resolver, validator } from "hono-openapi";
 import { episodeRequestSchema, episodeResponseSchema } from "@seedlog/schema";
 import { createDb } from "../db";
-import { logs, users } from "../db/schema";
+import { episodes, logs } from "../db/schema";
 import { generateEpisode } from "../lib/gemini";
+import { resolveCurrentUser } from "../lib/current-user";
 
 const episodesRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -20,32 +22,28 @@ episodesRoute.post(
           "application/json": { schema: resolver(episodeResponseSchema) }
         }
       },
-      404: { description: "ユーザーが見つかりません" },
+      401: { description: "未認証" },
       422: { description: "ログがまだありません" }
     }
   }),
   validator("json", episodeRequestSchema),
   async (c) => {
-    const { userId, prompt } = c.req.valid("json");
-    const db = createDb(c.env.DB);
+    const { prompt } = c.req.valid("json");
+    const currentUser = await resolveCurrentUser(c);
 
-    const user = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId))
-      .get();
-
-    if (!user) {
+    if (!currentUser.user) {
       return c.json(
-        { error: { code: "NOT_FOUND", message: "ユーザーが見つかりません" } },
-        404
+        { error: { code: "UNAUTHORIZED", message: "認証が必要です" } },
+        401
       );
     }
+
+    const db = createDb(c.env.DB);
 
     const userLogs = await db
       .select({ content: logs.content, createdAt: logs.createdAt })
       .from(logs)
-      .where(eq(logs.userId, userId))
+      .where(eq(logs.userId, currentUser.user.id))
       .orderBy(logs.createdAt, logs.id)
       .all();
 
@@ -67,6 +65,13 @@ episodesRoute.post(
       logContents,
       prompt
     );
+
+    await db.insert(episodes).values({
+      id: nanoid(),
+      userId: currentUser.user.id,
+      prompt,
+      content: episode
+    });
 
     return c.json({ episode });
   }

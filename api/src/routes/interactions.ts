@@ -224,7 +224,10 @@ interactionsRoute.post("/", async (c) => {
                   isNull(questions.answeredAt)
                 )
               )
-              .returning({ id: questions.id });
+              .returning({
+                id: questions.id,
+                githubRepo: questions.githubRepo
+              });
 
             if (updated.length === 0) {
               // 既回答 or 別ユーザーの質問
@@ -239,6 +242,7 @@ interactionsRoute.post("/", async (c) => {
               id: nanoid(),
               userId: user.id,
               questionId,
+              repo: updated[0].githubRepo,
               content,
               source: "discord_reply"
             });
@@ -265,6 +269,7 @@ interactionsRoute.post("/", async (c) => {
               id: nanoid(),
               userId: user.id,
               questionId: null,
+              repo: null,
               content,
               source: "discord_command"
             });

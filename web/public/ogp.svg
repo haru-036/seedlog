@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#052e16" />
+      <stop offset="100%" stop-color="#166534" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <rect
+    x="70"
+    y="70"
+    width="1060"
+    height="490"
+    rx="32"
+    fill="rgba(255,255,255,0.08)"
+  />
+  <text
+    x="120"
+    y="260"
+    fill="#dcfce7"
+    font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+    font-size="96"
+    font-weight="700"
+  >
+    Seedlog
+  </text>
+  <text
+    x="120"
+    y="345"
+    fill="#bbf7d0"
+    font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+    font-size="44"
+  >
+    開発の学びを記録して、振り返りを育てる
+  </text>
+  <circle cx="980" cy="190" r="70" fill="#86efac" />
+  <path
+    d="M920 430c58-78 142-112 198-128-22 53-68 146-176 168-31 6-47-13-22-40z"
+    fill="#dcfce7"
+  />
+</svg>

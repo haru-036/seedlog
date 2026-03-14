@@ -8,6 +8,7 @@ import {
 } from "@seedlog/schema";
 import { createDb } from "../db";
 import { logs } from "../db/schema";
+import { resolveCurrentUser } from "../lib/current-user";
 
 const logsRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -27,10 +28,19 @@ logsRoute.get(
   }),
   validator("query", logsQuerySchema),
   async (c) => {
-    const { userId, source, limit, offset } = c.req.valid("query");
+    const { source, limit, offset } = c.req.valid("query");
+    const currentUser = await resolveCurrentUser(c);
+
+    if (!currentUser.user) {
+      return c.json(
+        { error: { code: "UNAUTHORIZED", message: "認証が必要です" } },
+        401
+      );
+    }
+
     const db = createDb(c.env.DB);
 
-    const conditions = [eq(logs.userId, userId)];
+    const conditions = [eq(logs.userId, currentUser.user.id)];
     if (source) conditions.push(eq(logs.source, source));
     const where = and(...conditions);
 
@@ -54,6 +64,7 @@ logsRoute.get(
           id: row.id,
           userId: row.userId,
           questionId: row.questionId,
+          repo: row.repo,
           content: row.content,
           source: row.source,
           createdAt: row.createdAt.toISOString()

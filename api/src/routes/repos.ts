@@ -64,7 +64,7 @@ async function fetchGitHubReposPage(params: {
   perPage: number;
 }): Promise<GitHubReposPageResult> {
   const { accessToken, page, perPage } = params;
-  const url = `https://api.github.com/user/repos?type=owner&sort=updated&per_page=${perPage}&page=${page}`;
+  const url = `https://api.github.com/user/repos?affiliation=owner,collaborator,organization_member&sort=updated&per_page=${perPage}&page=${page}`;
 
   let res: Response;
   try {
