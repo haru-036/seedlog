@@ -418,6 +418,7 @@ X-Signature-Timestamp: <timestamp>
 3. ボタンクリック（`open_reply_modal:<questionId>`）→ 振り返りモーダルを表示
 4. モーダル送信（`question_reply:<questionId>`）→ logsテーブルに保存（`source: 'discord_reply'`、`repo` は question の `githubRepo` を引き継ぐ）、questionの`answeredAt`を更新
 5. `/log` コマンドのモーダル送信（`log_entry`）→ logsテーブルに保存（`source: 'discord_command'`）
+6. `/episode prompt:<要約指示>` → ユーザーの全ログをもとにエピソードを生成し、`episodes` テーブルへ保存してephemeralで返却
 
 **Error Responses**
 
