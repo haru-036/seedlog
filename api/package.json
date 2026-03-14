@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy --minify",
+    "discord:register-commands": "bun run scripts/register-discord-commands.ts",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "generate": "drizzle-kit generate",
     "migration:local": "wrangler d1 migrations apply seedlog --local",

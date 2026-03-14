@@ -13,7 +13,6 @@ import { MOCK_LOGS_RESPONSE } from "@/lib/mock-data";
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 const PAGE_SIZE = 10;
-const AI_LOGS_LIMIT = 100;
 
 type SourceFilter = "all" | "web" | "discord_command" | "discord_reply";
 
@@ -24,7 +23,6 @@ export function DashboardClient() {
   const offset = (page - 1) * PAGE_SIZE;
   const querySource = selectedSource === "all" ? null : selectedSource;
   const logsKey = `/api/logs?limit=${PAGE_SIZE}&offset=${offset}${querySource ? `&source=${querySource}` : ""}`;
-  const aiLogsKey = `/api/logs?limit=${AI_LOGS_LIMIT}&offset=0`;
 
   useEffect(() => {
     if (currentUser) {
@@ -42,15 +40,6 @@ export function DashboardClient() {
     }
   );
 
-  const { data: aiData } = useSWR<LogsListResponse>(
-    USE_MOCK ? null : aiLogsKey,
-    fetcher,
-    {
-      onError: (err) => console.warn("AI logs fetch failed:", err.message),
-      fallbackData: USE_MOCK ? MOCK_LOGS_RESPONSE : undefined
-    }
-  );
-
   const mockFilteredLogs = querySource
     ? MOCK_LOGS_RESPONSE.logs.filter((log) => log.source === querySource)
     : MOCK_LOGS_RESPONSE.logs;
@@ -61,7 +50,6 @@ export function DashboardClient() {
   const logs = USE_MOCK ? mockLogs : (listData?.logs ?? []);
   const total = USE_MOCK ? mockTotal : (listData?.total ?? 0);
   const hasMore = USE_MOCK ? mockHasMore : (listData?.hasMore ?? false);
-  const aiLogs = USE_MOCK ? MOCK_LOGS_RESPONSE.logs : (aiData?.logs ?? []);
 
   const [prefillContent, setPrefillContent] = useState<string>("");
 
@@ -115,7 +103,7 @@ export function DashboardClient() {
               onLogCreated={handleLogCreated}
               prefillContent={prefillContent}
             />
-            <AIPanel logs={aiLogs} />
+            <AIPanel />
           </div>
           <div className="space-y-4 lg:col-span-4 lg:space-y-6">
             <RepoSelectorPanel />
