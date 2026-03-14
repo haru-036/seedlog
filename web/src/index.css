@@ -76,8 +76,8 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
-  --repo-action: oklch(0.71 0.14 245);
-  --repo-action-hover: oklch(0.77 0.16 245);
+  --repo-action: oklch(0.56 0.14 245);
+  --repo-action-hover: oklch(0.5 0.14 245);
 }
 
 @theme inline {
