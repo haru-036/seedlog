@@ -39,6 +39,8 @@ GitHub push
 　↓
 Cloudflare Worker が webhook を受け取る
 　↓
+main の head commit から関連 PR を解決し、PR作者を優先して通知対象を決定（解決不可時は pusher にフォールバック）
+　↓
 コミット情報（ファイル名・変更回数・コミットメッセージ）をAIに渡して質問を生成
 　↓
 Discord REST API を叩いてユーザーにDMを送る

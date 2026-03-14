@@ -5,36 +5,186 @@ import { githubPushPayloadSchema } from "@seedlog/schema";
 import { createDb } from "../db";
 import { createDMChannel, sendDMMessage } from "../lib/discord";
 import { generateQuestion } from "../lib/gemini";
+import { decryptToken } from "../lib/token-crypto";
 import { questions, users } from "../db/schema";
 
 const githubRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
-function isUserInvolvedInPush(params: {
+type RepoWebhookAccessRecord = {
+  userId: string;
   githubLogin: string;
-  pusherName: string;
-  commits: Array<{
-    author?: { username?: string; name?: string };
-    committer?: { username?: string; name?: string };
-  }>;
-}): boolean {
-  const normalizedLogin = params.githubLogin.toLowerCase();
-  const normalizedPusher = params.pusherName.toLowerCase();
-  if (normalizedPusher === normalizedLogin) {
-    return true;
+};
+
+type GitHubPullRequestSummary = {
+  user: {
+    login: string;
+  };
+  base: {
+    ref: string;
+  };
+  head: {
+    sha: string;
+  };
+  merged_at: string | null;
+  merge_commit_sha: string | null;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parseRepoWebhookAccessRecord(
+  value: unknown
+): RepoWebhookAccessRecord | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (
+    typeof value.userId !== "string" ||
+    typeof value.githubLogin !== "string"
+  ) {
+    return null;
+  }
+  return {
+    userId: value.userId,
+    githubLogin: value.githubLogin
+  };
+}
+
+function isGitHubPullRequestSummary(
+  value: unknown
+): value is GitHubPullRequestSummary {
+  if (!isRecord(value)) {
+    return false;
   }
 
-  return params.commits.some((commit) => {
-    const candidateNames = [
-      commit.author?.username,
-      commit.author?.name,
-      commit.committer?.username,
-      commit.committer?.name
-    ]
-      .filter((value): value is string => typeof value === "string")
-      .map((value) => value.toLowerCase());
+  if (
+    !isRecord(value.user) ||
+    !isRecord(value.base) ||
+    !isRecord(value.head) ||
+    (value.merged_at !== null && typeof value.merged_at !== "string") ||
+    (value.merge_commit_sha !== null &&
+      value.merge_commit_sha !== undefined &&
+      typeof value.merge_commit_sha !== "string")
+  ) {
+    return false;
+  }
 
-    return candidateNames.includes(normalizedLogin);
+  return (
+    typeof value.user.login === "string" &&
+    typeof value.base.ref === "string" &&
+    typeof value.head.sha === "string"
+  );
+}
+
+function parseGitHubPullRequests(
+  value: unknown
+): GitHubPullRequestSummary[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  if (!value.every((item) => isGitHubPullRequestSummary(item))) {
+    return null;
+  }
+  return value;
+}
+
+function getRepoWebhookAccessKey(repoFullName: string): string {
+  return `webhook-access:${repoFullName}`;
+}
+
+async function findPrAuthorLogin(params: {
+  repoFullName: string;
+  headCommitSha: string;
+  env: CloudflareBindings;
+}): Promise<string | null> {
+  const { repoFullName, headCommitSha, env } = params;
+  const accessRaw = await env.WEBHOOK_KV.get(
+    getRepoWebhookAccessKey(repoFullName),
+    "json"
+  );
+  const access = parseRepoWebhookAccessRecord(accessRaw);
+  if (!access) {
+    return null;
+  }
+
+  const db = createDb(env.DB);
+  const accessUser = await db
+    .select({
+      id: users.id,
+      githubLogin: users.githubLogin,
+      githubAccessToken: users.githubAccessToken
+    })
+    .from(users)
+    .where(eq(users.id, access.userId))
+    .get();
+  if (!accessUser || !accessUser.githubAccessToken) {
+    return null;
+  }
+
+  let accessToken: string;
+  try {
+    accessToken = await decryptToken(
+      accessUser.githubAccessToken,
+      env.GITHUB_TOKEN_ENCRYPTION_KEY
+    );
+  } catch {
+    return null;
+  }
+
+  const [owner, repoName] = repoFullName.split("/");
+  if (!owner || !repoName) {
+    return null;
+  }
+
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repoName}/commits/${headCommitSha}/pulls`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/vnd.github+json",
+        "User-Agent": "seedlog-api",
+        "X-GitHub-Api-Version": "2022-11-28"
+      }
+    }
+  );
+
+  if (!res.ok) {
+    console.warn(
+      `PR解決API失敗: repo=${repoFullName} sha=${headCommitSha} status=${res.status}`
+    );
+    return null;
+  }
+
+  let raw: unknown;
+  try {
+    raw = await res.json();
+  } catch {
+    console.warn(`PR解決APIレスポンスパース失敗: repo=${repoFullName}`);
+    return null;
+  }
+  const prs = parseGitHubPullRequests(raw);
+  if (!prs || prs.length === 0) {
+    return null;
+  }
+
+  const mainMerged = prs.filter(
+    (pr) =>
+      pr.base.ref === "main" &&
+      pr.merged_at !== null &&
+      (pr.merge_commit_sha === headCommitSha || pr.head.sha === headCommitSha)
+  );
+  if (mainMerged.length === 0) {
+    return null;
+  }
+
+  mainMerged.sort((a, b) => {
+    const aTime = a.merged_at ? Date.parse(a.merged_at) : 0;
+    const bTime = b.merged_at ? Date.parse(b.merged_at) : 0;
+    return bTime - aTime;
   });
+
+  return mainMerged[0]?.user.login ?? null;
 }
 
 async function verifySignature(
@@ -120,22 +270,19 @@ githubRoute.post("/github", async (c) => {
 
   const db = createDb(c.env.DB);
 
+  const prAuthorLogin = await findPrAuthorLogin({
+    repoFullName: repository.full_name,
+    headCommitSha: head_commit.id,
+    env: c.env
+  });
+  const targetLogin = prAuthorLogin ?? pusher.name;
+
   const user = await db
     .select()
     .from(users)
-    .where(eq(users.githubLogin, pusher.name))
+    .where(eq(users.githubLogin, targetLogin))
     .get();
   if (!user) {
-    return c.json({ ok: true });
-  }
-
-  if (
-    !isUserInvolvedInPush({
-      githubLogin: user.githubLogin,
-      pusherName: pusher.name,
-      commits
-    })
-  ) {
     return c.json({ ok: true });
   }
 

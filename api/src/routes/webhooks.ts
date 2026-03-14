@@ -13,6 +13,7 @@ import { users } from "../db/schema";
 import { decryptToken } from "../lib/token-crypto";
 
 type WebhookRecord = { repo: string; hookId: number | null };
+type RepoWebhookAccessRecord = { userId: string; githubLogin: string };
 
 type GitHubWebhookError = {
   resource: string;
@@ -99,6 +100,48 @@ async function removeWebhookRecord(
   const records = await getWebhookRecords(kv, userId);
   const nextRecords = records.filter((record) => record.repo !== repo);
   await kv.put(`webhooks:${userId}`, JSON.stringify(nextRecords));
+}
+
+function getRepoWebhookAccessKey(repo: string): string {
+  return `webhook-access:${repo}`;
+}
+
+async function setRepoWebhookAccess(
+  kv: KVNamespace,
+  repo: string,
+  access: RepoWebhookAccessRecord
+): Promise<void> {
+  await kv.put(getRepoWebhookAccessKey(repo), JSON.stringify(access));
+}
+
+function parseRepoWebhookAccessRecord(
+  value: unknown
+): RepoWebhookAccessRecord | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (
+    typeof value.userId !== "string" ||
+    typeof value.githubLogin !== "string"
+  ) {
+    return null;
+  }
+  return {
+    userId: value.userId,
+    githubLogin: value.githubLogin
+  };
+}
+
+async function removeRepoWebhookAccessIfOwnedBy(
+  kv: KVNamespace,
+  repo: string,
+  userId: string
+): Promise<void> {
+  const currentRaw = await kv.get(getRepoWebhookAccessKey(repo), "json");
+  const current = parseRepoWebhookAccessRecord(currentRaw);
+  if (current?.userId === userId) {
+    await kv.delete(getRepoWebhookAccessKey(repo));
+  }
 }
 
 const webhooksRoute = new Hono<{ Bindings: CloudflareBindings }>();
@@ -285,6 +328,10 @@ webhooksRoute.post(
           console.error("既存 Webhook の hookId 取得に失敗:", err);
         }
         await addWebhookRecord(c.env.WEBHOOK_KV, user.id, repo, existingHookId);
+        await setRepoWebhookAccess(c.env.WEBHOOK_KV, repo, {
+          userId: user.id,
+          githubLogin: user.githubLogin
+        });
         return c.json({ ok: true, message: "webhookはすでに登録済みです" });
       }
       return c.json(
@@ -301,14 +348,17 @@ webhooksRoute.post(
     // 403/404: リポジトリへの管理者権限がない場合（コントリビューターなど）
     // GitHub Webhook の作成には管理者権限が必要なため、ここでは KV のみ登録する。
     // hookId=null で登録されるため unregister 時は GitHub API を呼び出さない。
-    // プッシュ通知は github.ts の push ハンドラーが pusher.name でユーザーを特定して
-    // 配信するため、KV 登録のみで通知は機能する（リポジトリオーナーが webhook を
-    // 設定済みであることが前提）。
+    // プッシュ通知は github.ts の push ハンドラーで対象ユーザーを解決して配信するため、
+    // KV 登録のみで通知は機能する（リポジトリオーナーが webhook を設定済みであることが前提）。
     if (res.status === 403 || res.status === 404) {
       console.warn(
         `GitHub webhook 作成: 権限なし (status=${res.status}) repo=${repo} user=${githubLogin}`
       );
       await addWebhookRecord(c.env.WEBHOOK_KV, user.id, repo, null);
+      await setRepoWebhookAccess(c.env.WEBHOOK_KV, repo, {
+        userId: user.id,
+        githubLogin: user.githubLogin
+      });
       return c.json({ ok: true, message: "no_admin_access" });
     }
 
@@ -341,6 +391,10 @@ webhooksRoute.post(
     }
 
     await addWebhookRecord(c.env.WEBHOOK_KV, user.id, repo, hookPayload.id);
+    await setRepoWebhookAccess(c.env.WEBHOOK_KV, repo, {
+      userId: user.id,
+      githubLogin: user.githubLogin
+    });
     return c.json({ ok: true, hookId: hookPayload.id }, 201);
   }
 );
@@ -453,6 +507,7 @@ webhooksRoute.delete(
     }
 
     await removeWebhookRecord(c.env.WEBHOOK_KV, user.id, repo);
+    await removeRepoWebhookAccessIfOwnedBy(c.env.WEBHOOK_KV, repo, user.id);
     return c.json({ ok: true });
   }
 );
