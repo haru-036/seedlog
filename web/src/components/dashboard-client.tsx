@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import useSWR, { mutate } from 'swr'
 import { DashboardHeader } from '@/components/dashboard-header'
 import { LogForm } from '@/components/log-form'
