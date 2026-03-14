@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { API_BASE } from "../lib/api";
 
 // 通知データの型定義
-export default function ReposPage() {
+export default function DashboardHeader() {
   const [githubLogin, setGithubLogin] = useState<string | null>(null);
   const [discordUsername, setDiscordUsername] = useState<string | null>(null);
   const [_discordBotInstallFlag, setDiscordBotInstallFlag] = useState<
@@ -23,8 +23,8 @@ export default function ReposPage() {
   }, []);
 
   return (
-    <div className="min-h-screen">
-    <header className="border-b border-neutral-800 px-6 py-4 flex items-center justify-between">
+      <>
+          <header className="border-b border-neutral-800 px-6 py-4 flex items-center justify-between">
             <h1 className="text-xl font-bold">🌱 Seedlog</h1>
             <div className="flex items-center gap-4">
               {githubLogin && (
@@ -65,17 +65,17 @@ export default function ReposPage() {
               )}
             </div>
           </header>
-      {discordUsername && discordDmDeliverable === "0" && (
-        <div className="max-w-2xl mx-auto px-6 pt-4">
-          <p className="text-sm text-red-300">
-            DMを送信できませんでした（
-            {discordDmReason === "blocked_or_closed"
-              ? "DM受信設定またはBotブロック"
-              : "不明なエラー"}
-            ）。Discord 再連携で再チェックできます。
-          </p>
-        </div>
-      )}
-    </div>
+        {discordUsername && discordDmDeliverable === "0" && (
+          <div className="max-w-2xl mx-auto px-6 pt-4">
+            <p className="text-sm text-red-300">
+              DMを送信できませんでした（
+              {discordDmReason === "blocked_or_closed"
+                ? "DM受信設定またはBotブロック"
+                : "不明なエラー"}
+              ）。Discord 再連携で再チェックできます。
+            </p>
+          </div>
+        )}
+      </>
   )
 }
