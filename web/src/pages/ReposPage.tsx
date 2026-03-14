@@ -6,8 +6,15 @@ import type {
   WebhooksListResponse
 } from "@seedlog/schema";
 import { apiFetch, API_BASE, fetcher } from "../lib/api";
+import { Lock } from "lucide-react";
 
-type WebhookStatus = "idle" | "loading" | "done" | "exists" | "error";
+type WebhookStatus =
+  | "idle"
+  | "loading"
+  | "unregistering"
+  | "done"
+  | "exists"
+  | "error";
 
 function RepoItem({
   repo,
@@ -46,15 +53,53 @@ function RepoItem({
     }
   }
 
+  async function unregisterWebhook() {
+    const shouldUnregister = window.confirm(
+      `${repo.fullName} の Webhook 登録を解除しますか？`
+    );
+    if (!shouldUnregister) return;
+
+    setStatus("unregistering");
+    try {
+      const res = await apiFetch("/api/webhooks/unregister", {
+        method: "DELETE",
+        body: JSON.stringify({ repo: repo.fullName })
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: { code: string; message: string };
+      };
+      if (!res.ok) {
+        console.error(data.error);
+        setStatus("error");
+        return;
+      }
+      setStatus("idle");
+      await mutate("/api/webhooks");
+    } catch (err) {
+      console.error("Webhook 解除に失敗しました:", err);
+      setStatus("error");
+    }
+  }
+
   return (
-    <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+    <div className="flex items-center justify-between p-4 rounded-lg">
       <div className="min-w-0">
-        <p className="text-white font-medium truncate">{repo.fullName}</p>
+        <p className="text-foreground font-medium truncate">{repo.fullName}</p>
         {repo.description && (
-          <p className="text-gray-400 text-sm truncate">{repo.description}</p>
+          <p className="text-muted-foreground text-sm truncate">
+            {repo.description}
+          </p>
         )}
-        <p className="text-gray-500 text-xs mt-0.5">
-          {repo.private ? "🔒 Private" : "🌐 Public"}
+        <p className="text-muted-foreground text-xs mt-0.5">
+          {repo.private ? (
+            <span>
+              <Lock className="size-4 inline-block mr-1" />
+              Private
+            </span>
+          ) : (
+            "🌐 Public"
+          )}
         </p>
       </div>
       <div className="ml-4 shrink-0">
@@ -67,21 +112,43 @@ function RepoItem({
           </button>
         )}
         {status === "loading" && (
-          <span className="text-sm text-gray-400">登録中...</span>
+          <span className="text-sm text-muted-foreground">登録中...</span>
         )}
-        {status === "done" && (
-          <span className="text-sm text-green-400">✅ 登録済み</span>
+        {status === "unregistering" && (
+          <span className="text-sm text-muted-foreground">解除中...</span>
         )}
-        {status === "exists" && (
-          <span className="text-sm text-yellow-400">⚠️ 既に登録済み</span>
+        {(status === "done" || status === "exists") && (
+          <div className="flex items-center gap-3">
+            <span
+              className={`text-sm ${status === "exists" ? "text-yellow-400" : "text-green-400"}`}
+            >
+              {status === "exists" ? "⚠️ 既に登録済み" : "✅ 登録済み"}
+            </span>
+            <button
+              onClick={unregisterWebhook}
+              className="text-sm bg-neutral-800 text-neutral-200 px-3 py-1.5 rounded hover:bg-neutral-700 transition-colors"
+            >
+              解除
+            </button>
+          </div>
         )}
         {status === "error" && (
-          <button
-            onClick={registerWebhook}
-            className="text-sm bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-500 transition-colors"
-          >
-            失敗（再試行）
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={registerWebhook}
+              className="text-sm bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-500 transition-colors"
+            >
+              登録を再試行
+            </button>
+            {isRegistered && (
+              <button
+                onClick={unregisterWebhook}
+                className="text-sm bg-neutral-800 text-neutral-200 px-3 py-1.5 rounded hover:bg-neutral-700 transition-colors"
+              >
+                解除
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -90,10 +157,23 @@ function RepoItem({
 
 export default function ReposPage() {
   const [githubLogin, setGithubLogin] = useState<string | null>(null);
+  const [discordUsername, setDiscordUsername] = useState<string | null>(null);
+  const [discordBotInstallFlag, setDiscordBotInstallFlag] = useState<
+    string | null
+  >(null);
+  const [discordDmDeliverable, setDiscordDmDeliverable] = useState<
+    string | null
+  >(null);
+  const [discordDmReason, setDiscordDmReason] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
     setGithubLogin(localStorage.getItem("githubLogin"));
+    const username = localStorage.getItem("discordUsername");
+    setDiscordUsername(username);
+    setDiscordBotInstallFlag(localStorage.getItem("discordBotInstalled"));
+    setDiscordDmDeliverable(localStorage.getItem("discordDmDeliverable"));
+    setDiscordDmReason(localStorage.getItem("discordDmReason"));
   }, []);
 
   const { data, error, isLoading } = useSWR<ReposResponse>(
@@ -109,37 +189,76 @@ export default function ReposPage() {
   const registeredSet = new Set(webhooksData?.repos ?? []);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen">
+      <header className="border-b border-neutral-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-bold">🌱 Seedlog</h1>
         <div className="flex items-center gap-4">
           {githubLogin && (
-            <span className="text-sm text-gray-400">@{githubLogin}</span>
+            <span className="text-sm text-muted-foreground">
+              @{githubLogin}
+            </span>
           )}
+          {discordUsername ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                Discord: {discordUsername}
+              </span>
+              {discordDmDeliverable === "1" && (
+                <span className="text-xs bg-emerald-900 text-emerald-300 px-2 py-0.5 rounded">
+                  DM受信可能
+                </span>
+              )}
+              {discordDmDeliverable === "0" && (
+                <span className="text-xs bg-red-900 text-red-300 px-2 py-0.5 rounded">
+                  DM受信不可
+                </span>
+              )}
+            </div>
+          ) : null}
           <a
             href={`${API_BASE}/api/auth/discord`}
             className="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded hover:bg-indigo-500 transition-colors"
           >
-            Discord 連携
+            {discordUsername ? "Discord 再連携" : "Discord 連携"}
           </a>
+          {discordUsername && discordBotInstallFlag === "0" && (
+            <a
+              href={`${API_BASE}/api/auth/discord/install`}
+              className="text-sm bg-emerald-600 text-white px-3 py-1.5 rounded hover:bg-emerald-500 transition-colors"
+            >
+              Bot をサーバーに追加
+            </a>
+          )}
         </div>
       </header>
+
+      {discordUsername && discordDmDeliverable === "0" && (
+        <div className="max-w-2xl mx-auto px-6 pt-4">
+          <p className="text-sm text-red-300">
+            DMを送信できませんでした（
+            {discordDmReason === "blocked_or_closed"
+              ? "DM受信設定またはBotブロック"
+              : "不明なエラー"}
+            ）。Discord 再連携で再チェックできます。
+          </p>
+        </div>
+      )}
 
       <main className="max-w-2xl mx-auto px-6 py-8 space-y-4">
         <div>
           <h2 className="text-lg font-semibold">リポジトリ選択</h2>
-          <p className="text-gray-400 text-sm mt-1">
+          <p className="text-neutral-400 text-sm mt-1">
             Webhook を登録するリポジトリを選んでください。push
             されると自動で質問が届きます。
           </p>
         </div>
 
-        {isLoading && <p className="text-gray-400 text-sm">読み込み中...</p>}
+        {isLoading && <p className="text-neutral-400 text-sm">読み込み中...</p>}
         {error && (
           <p className="text-red-400 text-sm">リポジトリの取得に失敗しました</p>
         )}
         {!isLoading && !error && repos.length === 0 && (
-          <p className="text-gray-400 text-sm">
+          <p className="text-neutral-400 text-sm">
             リポジトリが見つかりませんでした。
           </p>
         )}
@@ -162,15 +281,15 @@ export default function ReposPage() {
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="text-sm px-3 py-1.5 rounded bg-gray-800 text-gray-300 disabled:opacity-40 hover:bg-gray-700 transition-colors"
+              className="text-sm px-3 py-1.5 rounded bg-neutral-800 text-neutral-300 disabled:opacity-40 hover:bg-neutral-700 transition-colors"
             >
               ← 前へ
             </button>
-            <span className="text-sm text-gray-500">{page} ページ</span>
+            <span className="text-sm text-neutral-500">{page} ページ</span>
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={!data?.hasNextPage}
-              className="text-sm px-3 py-1.5 rounded bg-gray-800 text-gray-300 disabled:opacity-40 hover:bg-gray-700 transition-colors"
+              className="text-sm px-3 py-1.5 rounded bg-neutral-800 text-neutral-300 disabled:opacity-40 hover:bg-neutral-700 transition-colors"
             >
               次へ →
             </button>

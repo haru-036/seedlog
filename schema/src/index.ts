@@ -90,7 +90,13 @@ export const discordTokenResponseSchema = z.object({
   discordUsername: z.string()
 });
 
+export const discordDmStatusSchema = z.object({
+  deliverable: z.boolean(),
+  reason: z.enum(["ok", "blocked_or_closed", "unknown_error"])
+});
+
 export type DiscordTokenResponse = z.infer<typeof discordTokenResponseSchema>;
+export type DiscordDmStatus = z.infer<typeof discordDmStatusSchema>;
 
 // ---- GitHub OAuth ----
 
@@ -110,7 +116,24 @@ export const registerWebhookSchema = z.object({
     .regex(/^[^/]+\/[^/]+$/, "repo は owner/repo 形式で指定してください")
 });
 
+export const unregisterWebhookSchema = z.object({
+  repo: z
+    .string()
+    .min(1, "repoは必須です")
+    .regex(/^[^/]+\/[^/]+$/, "repo は owner/repo 形式で指定してください")
+});
+
+export const webhookMutationResponseSchema = z.object({
+  ok: z.boolean(),
+  message: z.string().optional(),
+  hookId: z.number().nullable().optional()
+});
+
 export type RegisterWebhookInput = z.infer<typeof registerWebhookSchema>;
+export type UnregisterWebhookInput = z.infer<typeof unregisterWebhookSchema>;
+export type WebhookMutationResponse = z.infer<
+  typeof webhookMutationResponseSchema
+>;
 
 // ---- Logs ----
 

@@ -102,6 +102,69 @@ X-GitHub-Event: push
 
 ---
 
+## Discord連携
+
+### `GET /api/auth/discord` ✅ 実装済み
+
+Discord OAuth 認証フローを開始する（サーバー追加画面はこの時点では表示しない）。
+
+**処理の流れ**
+
+1. CSRF 対策用のランダム state を生成し `discord_oauth_state` cookie にセット（httpOnly, Secure, SameSite=Lax, 5分）
+2. Discord の OAuth 認可画面へリダイレクト（scope: `identify guilds`）
+
+**レスポンス**
+
+- `302 Redirect` → Discord 認可画面
+
+---
+
+### `GET /api/auth/discord/install` ✅ 実装済み
+
+Discord Bot をサーバーに追加するための招待フローを開始する。
+
+**処理の流れ**
+
+1. Discord OAuth 認可画面へリダイレクト（scope: `bot`, permissions: `2048`）
+
+**レスポンス**
+
+- `302 Redirect` → Discord Bot 招待画面
+
+---
+
+### `GET /api/auth/discord/callback` ✅ 実装済み
+
+Discord OAuth コールバックを受け取り、ユーザー連携を確定する。
+
+**処理の流れ（抜粋）**
+
+1. CSRF state を検証
+2. code でアクセストークン交換
+3. Discord ユーザー情報を取得
+4. `github_user` Cookie に紐づくユーザーへ `discordId` を保存
+5. ユーザーが管理可能なサーバーに Bot が導入済みか判定
+6. フロントへリダイレクト
+
+**成功レスポンス**
+
+- `302 Redirect` → `${FRONTEND_URL}/auth/discord/callback?code=<one-time-code>&needsBotInstall=<0|1>&dmDeliverable=<0|1>&dmReason=<reason>`
+
+`needsBotInstall=1` の場合は、別途 `GET /api/auth/discord/install` で Bot 招待が必要。
+
+`dmDeliverable` は OAuth 完了時にテストDMを実送信して判定される。
+
+- `dmDeliverable=1` : 現時点でDM到達可能
+- `dmDeliverable=0` : 現時点でDM到達不可
+
+`dmReason` は以下のいずれか。
+
+- `ok` : 送達成功
+- `blocked_or_closed` : ユーザー側DM受信設定またはBotブロックの可能性
+- `unknown_error` : 一時障害など判別不能な失敗
+
+---
+
 ## GitHub連携
 
 ### `GET /api/auth/github` ✅ 実装済み
@@ -273,92 +336,42 @@ error?: string
 
 ---
 
-## Discord連携
+### `DELETE /api/webhooks/unregister` ✅ 実装済み
 
-### `GET /api/auth/discord` ✅ 実装済み
+指定リポジトリの GitHub Webhook 登録を解除する。
 
-Discord OAuth 認証フローを開始する。
+**Request**
 
-**処理の流れ**
-
-1. CSRF 対策用のランダム state を生成し `discord_oauth_state` cookie にセット（httpOnly, Secure, SameSite=Lax, 5分）
-2. Discord の OAuth 認可画面へリダイレクト（scope: `identify bot`, permissions: `2048`）
-
-**必要な環境変数**
-
-- `DISCORD_CLIENT_ID`
-- `DISCORD_REDIRECT_URI`
-
-**レスポンス**
-
-- `302 Redirect` → Discord 認可画面
-
----
-
-### `GET /api/auth/discord/callback` ✅ 実装済み
-
-Discord OAuth コールバックを受け取る。
-
-**Query Parameters**
-
-```
-code?: string   — Discord が返す認可コード
-error?: string  — エラー時（例: "access_denied"）
+```typescript
+{
+  repo: string; // "owner/repo" 形式（認証ユーザーは github_user 署名済み Cookie から解決）
+}
 ```
 
 **処理の流れ**
 
-1. `discord_oauth_state` cookie と返ってきた `state` を比較（CSRF検証）
-2. Discord に code でアクセストークンを交換
-3. Discord ユーザー情報（id, username）を取得
-4. 一時トークン（nanoid, TTL 5分）を D1 に保存
-5. フロントエンドへリダイレクト（`?code=<one-time-token>`）
-
-**必要な環境変数**
-
-- `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI`
-- `FRONTEND_URL`
-
-**成功レスポンス**
-
-- `302 Redirect` → `${FRONTEND_URL}/auth/discord/callback?code=<one-time-token>`
-
-**エラーレスポンス**
-
-- `302 Redirect` → `${FRONTEND_URL}/auth/error?reason=<reason>`
-  - `reason=access_denied` — ユーザーが認証を拒否
-  - `reason=state_mismatch` — CSRF 検証失敗
-  - `reason=token_exchange` — Discord のトークン交換失敗
-  - `reason=user_fetch` — Discord ユーザー情報の取得失敗
-
----
-
-### `GET /api/auth/discord/token` ✅ 実装済み
-
-フロントエンドが one-time code を Discord ユーザーデータと交換するエンドポイント。
-
-**Query Parameters**
-
-```
-code: string — /api/auth/discord/callback で受け取った one-time token
-```
+1. `github_user` cookie から認証済みユーザーの GitHub login を解決
+2. KV に保存された対象 repo の webhook record を取得
+3. `hookId` がある場合のみ GitHub API `DELETE /repos/{owner}/{repo}/hooks/{hookId}` を呼び出し
+4. GitHub 側が 404 または `hookId` が null の場合も、KV 上の登録記録は削除する
 
 **Response** `200 OK`
 
 ```typescript
 {
-  discordId: string;
-  discordUsername: string;
+  ok: true;
 }
 ```
 
 **Error Responses**
 
-- `400 Bad Request` — code パラメーターが missing
-- `404 Not Found` — コードが存在しない
-- `410 Gone` — コードの有効期限切れ（TTL: 5分）
+- `401 Unauthorized` — `github_user` cookie が未設定、または GitHub 未連携（githubAccessToken が未設定）
+- `404 Not Found` — ユーザーまたは対象 webhook record が見つからない
+- `502 Bad Gateway` — GitHub API エラー
 
 ---
+
+## Discord Interactions
 
 ### `POST /api/interactions` ✅ 実装済み
 

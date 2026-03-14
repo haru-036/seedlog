@@ -12,16 +12,23 @@ import { eq, lt } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import {
   discordCallbackQuerySchema,
+  discordDmStatusSchema,
+  type DiscordDmStatus,
   githubCallbackQuerySchema
 } from "@seedlog/schema";
 import { oauthCodes, users } from "../db/schema";
 import { encryptToken } from "../lib/token-crypto";
+import { createDMChannel, sendDMMessage } from "../lib/discord";
 
 const authRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
 const DISCORD_OAUTH_URL = "https://discord.com/api/oauth2/authorize";
 const DISCORD_TOKEN_URL = "https://discord.com/api/oauth2/token";
 const DISCORD_USER_URL = "https://discord.com/api/users/@me";
+const DISCORD_USER_GUILDS_URL = "https://discord.com/api/users/@me/guilds";
+
+const ADMINISTRATOR_PERMISSION = 0x8n;
+const MANAGE_GUILD_PERMISSION = 0x20n;
 
 function generateState(): string {
   const bytes = new Uint8Array(32);
@@ -29,6 +36,104 @@ function generateState(): string {
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+function canManageGuild(guild: {
+  owner?: boolean;
+  permissions?: string;
+}): boolean {
+  if (guild.owner) return true;
+  if (!guild.permissions) return false;
+  try {
+    const permissions = BigInt(guild.permissions);
+    return (
+      (permissions & ADMINISTRATOR_PERMISSION) !== 0n ||
+      (permissions & MANAGE_GUILD_PERMISSION) !== 0n
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function hasBotInAnyManageableGuild(
+  accessToken: string,
+  botToken: string,
+  applicationId: string
+): Promise<boolean> {
+  const guildRes = await fetch(DISCORD_USER_GUILDS_URL, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+
+  if (!guildRes.ok) {
+    console.error("Discord guild list fetch error:", await guildRes.text());
+    return false;
+  }
+
+  const guilds = (await guildRes.json()) as Array<{
+    id: string;
+    owner?: boolean;
+    permissions?: string;
+  }>;
+
+  const manageableGuildIds = guilds.filter(canManageGuild).map((g) => g.id);
+  if (manageableGuildIds.length === 0) return false;
+
+  const checks = manageableGuildIds.map(async (guildId) => {
+    try {
+      const memberRes = await fetch(
+        `https://discord.com/api/v10/guilds/${guildId}/members/${applicationId}`,
+        {
+          headers: { Authorization: `Bot ${botToken}` }
+        }
+      );
+
+      if (memberRes.ok) {
+        return true;
+      }
+
+      if (memberRes.status !== 404) {
+        console.error(
+          `Discord bot member check failed for guild ${guildId}: ${memberRes.status}`
+        );
+      }
+    } catch (err) {
+      console.error(
+        `Discord bot member check error for guild ${guildId}:`,
+        err
+      );
+    }
+
+    throw new Error("BOT_NOT_IN_GUILD");
+  });
+
+  try {
+    await Promise.any(checks);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function testDmDeliverability(
+  botToken: string,
+  discordUserId: string
+): Promise<DiscordDmStatus> {
+  try {
+    const channelId = await createDMChannel(botToken, discordUserId);
+    await sendDMMessage(
+      botToken,
+      channelId,
+      "Seedlog: 接続テストDMです。今後の振り返り質問はこのDMに届きます。"
+    );
+    return discordDmStatusSchema.parse({ deliverable: true, reason: "ok" });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const isBlockedOrClosed = /Discord API error (400|403):/.test(msg);
+    return discordDmStatusSchema.parse({
+      deliverable: false,
+      reason: isBlockedOrClosed ? "blocked_or_closed" : "unknown_error"
+    });
+  }
 }
 
 authRoute.get("/discord", async (c) => {
@@ -48,9 +153,17 @@ authRoute.get("/discord", async (c) => {
     client_id: c.env.DISCORD_CLIENT_ID,
     redirect_uri: c.env.DISCORD_REDIRECT_URI,
     response_type: "code",
-    scope: "identify bot",
-    permissions: "2048",
+    scope: "identify guilds",
     state
+  });
+  return c.redirect(`${DISCORD_OAUTH_URL}?${params}`);
+});
+
+authRoute.get("/discord/install", (c) => {
+  const params = new URLSearchParams({
+    client_id: c.env.APPLICATION_ID,
+    scope: "bot",
+    permissions: "2048"
   });
   return c.redirect(`${DISCORD_OAUTH_URL}?${params}`);
 });
@@ -122,6 +235,18 @@ authRoute.get(
       global_name?: string;
     };
 
+    const hasInstalledBot = await hasBotInAnyManageableGuild(
+      tokenData.access_token,
+      c.env.DISCORD_BOT_TOKEN,
+      c.env.APPLICATION_ID
+    );
+    const dmStatus = await Promise.race<DiscordDmStatus>([
+      testDmDeliverability(c.env.DISCORD_BOT_TOKEN, discordUser.id),
+      new Promise<DiscordDmStatus>((_, reject) => {
+        setTimeout(() => reject(new Error("DM_TEST_TIMEOUT")), 3000);
+      })
+    ]).catch(() => ({ deliverable: false, reason: "unknown_error" }));
+
     const db = drizzle(c.env.DB);
     const onetimeCode = nanoid();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5分
@@ -152,6 +277,15 @@ authRoute.get(
 
     const redirectUrl = new URL(`${c.env.FRONTEND_URL}/auth/discord/callback`);
     redirectUrl.searchParams.set("code", onetimeCode);
+    redirectUrl.searchParams.set(
+      "needsBotInstall",
+      hasInstalledBot ? "0" : "1"
+    );
+    redirectUrl.searchParams.set(
+      "dmDeliverable",
+      dmStatus.deliverable ? "1" : "0"
+    );
+    redirectUrl.searchParams.set("dmReason", dmStatus.reason);
     return c.redirect(redirectUrl.toString());
   }
 );
