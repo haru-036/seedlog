@@ -1,28 +1,40 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { LogCard } from './log-card'
-import { FileText } from 'lucide-react'
-import type { Log } from './dashboard-client'
+import { useState } from "react";
+import { LogCard } from "./log-card";
+import { FileText } from "lucide-react";
+import type { Log } from "./dashboard-client";
 
 interface LogListProps {
-  logs: Log[]
-  onLogDeleted?: (id: string) => void
+  logs: Log[];
+  onLogDeleted?: (id: string) => void;
 }
 
 const SOURCES = [
-  { value: 'web', label: 'Webから', color: 'bg-blue-500/20 text-blue-400' },
-  { value: 'github_push', label: 'GitHub', color: 'bg-gray-500/20 text-gray-400' },
-  { value: 'discord_command', label: 'Discord', color: 'bg-indigo-500/20 text-indigo-400' },
-  { value: 'discord_reply', label: 'Discord (返信)', color: 'bg-indigo-500/20 text-indigo-400' },
-]
+  { value: "web", label: "Webから", color: "bg-blue-500/20 text-blue-400" },
+  {
+    value: "github_push",
+    label: "GitHub",
+    color: "bg-gray-500/20 text-gray-400"
+  },
+  {
+    value: "discord_command",
+    label: "Discord",
+    color: "bg-indigo-500/20 text-indigo-400"
+  },
+  {
+    value: "discord_reply",
+    label: "Discord (返信)",
+    color: "bg-indigo-500/20 text-indigo-400"
+  }
+];
 
 export function LogList({ logs, onLogDeleted }: LogListProps) {
-  const [selectedSource, setSelectedSource] = useState<string | null>(null)
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
 
   const filteredLogs = selectedSource
     ? logs.filter((log) => log.source === selectedSource)
-    : logs
+    : logs;
 
   return (
     <div className="flex flex-col gap-4">
@@ -31,8 +43,8 @@ export function LogList({ logs, onLogDeleted }: LogListProps) {
           onClick={() => setSelectedSource(null)}
           className={`px-3 py-1 rounded-full text-sm transition-colors ${
             selectedSource === null
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+              ? "bg-primary text-primary-foreground"
+              : "bg-secondary text-muted-foreground hover:bg-secondary/80"
           }`}
         >
           すべて
@@ -44,7 +56,7 @@ export function LogList({ logs, onLogDeleted }: LogListProps) {
             className={`px-3 py-1 rounded-full text-sm transition-colors ${
               selectedSource === source.value
                 ? source.color
-                : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                : "bg-secondary text-muted-foreground hover:bg-secondary/80"
             }`}
           >
             {source.label}
@@ -65,5 +77,5 @@ export function LogList({ logs, onLogDeleted }: LogListProps) {
         </div>
       )}
     </div>
-  )
+  );
 }

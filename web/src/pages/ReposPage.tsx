@@ -5,6 +5,7 @@ import type {
   ReposResponse,
   WebhooksListResponse
 } from "@seedlog/schema";
+import { webhookMutationResponseSchema } from "@seedlog/schema";
 import { apiFetch, API_BASE, fetcher } from "../lib/api";
 import { Lock } from "lucide-react";
 
@@ -34,16 +35,22 @@ function RepoItem({
         method: "POST",
         body: JSON.stringify({ repo: repo.fullName })
       });
-      const data = (await res.json()) as {
-        ok?: boolean;
-        message?: string;
-        error?: { code: string; message: string };
-      };
+
+      const raw = await res.json();
+      const parsed = webhookMutationResponseSchema.safeParse(raw);
       if (!res.ok) {
-        console.error(data.error);
+        console.error(raw);
         setStatus("error");
         return;
       }
+
+      if (!parsed.success) {
+        console.error("Webhook 登録レスポンス形式が不正です", parsed.error);
+        setStatus("error");
+        return;
+      }
+
+      const data = parsed.data;
       const newStatus = data.message?.includes("すでに") ? "exists" : "done";
       setStatus(newStatus);
       await mutate("/api/webhooks");
@@ -65,15 +72,21 @@ function RepoItem({
         method: "DELETE",
         body: JSON.stringify({ repo: repo.fullName })
       });
-      const data = (await res.json()) as {
-        ok?: boolean;
-        error?: { code: string; message: string };
-      };
+
+      const raw = await res.json();
+      const parsed = webhookMutationResponseSchema.safeParse(raw);
       if (!res.ok) {
-        console.error(data.error);
+        console.error(raw);
         setStatus("error");
         return;
       }
+
+      if (!parsed.success) {
+        console.error("Webhook 解除レスポンス形式が不正です", parsed.error);
+        setStatus("error");
+        return;
+      }
+
       setStatus("idle");
       await mutate("/api/webhooks");
     } catch (err) {
@@ -166,6 +179,7 @@ export default function ReposPage() {
   >(null);
   const [discordDmReason, setDiscordDmReason] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     setGithubLogin(localStorage.getItem("githubLogin"));
@@ -176,8 +190,17 @@ export default function ReposPage() {
     setDiscordDmReason(localStorage.getItem("discordDmReason"));
   }, []);
 
+  const reposQuery = query.trim();
+  const params = new URLSearchParams({
+    page: String(page),
+    per_page: "20"
+  });
+  if (reposQuery.length > 0) {
+    params.set("query", reposQuery);
+  }
+
   const { data, error, isLoading } = useSWR<ReposResponse>(
-    `/api/repos?page=${page}&per_page=20`,
+    `/api/repos?${params.toString()}`,
     fetcher
   );
   const { data: webhooksData } = useSWR<WebhooksListResponse>(
@@ -253,13 +276,28 @@ export default function ReposPage() {
           </p>
         </div>
 
+        <div>
+          <input
+            type="text"
+            value={query}
+            onChange={(event) => {
+              setPage(1);
+              setQuery(event.target.value);
+            }}
+            placeholder="リポジトリ名で検索"
+            className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:outline-none"
+          />
+        </div>
+
         {isLoading && <p className="text-neutral-400 text-sm">読み込み中...</p>}
         {error && (
           <p className="text-red-400 text-sm">リポジトリの取得に失敗しました</p>
         )}
         {!isLoading && !error && repos.length === 0 && (
           <p className="text-neutral-400 text-sm">
-            リポジトリが見つかりませんでした。
+            {reposQuery
+              ? "検索条件に一致するリポジトリが見つかりませんでした。"
+              : "リポジトリが見つかりませんでした。"}
           </p>
         )}
 

@@ -14,6 +14,62 @@ import { decryptToken } from "../lib/token-crypto";
 
 type WebhookRecord = { repo: string; hookId: number | null };
 
+type GitHubWebhookError = {
+  resource: string;
+  code: string;
+  message: string;
+};
+
+type GitHubWebhookErrorBody = {
+  errors?: GitHubWebhookError[];
+};
+
+type GitHubHook = {
+  id: number;
+  config: { url?: string };
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isGitHubWebhookError(value: unknown): value is GitHubWebhookError {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.resource === "string" &&
+    typeof value.code === "string" &&
+    typeof value.message === "string"
+  );
+}
+
+function parseGitHubWebhookErrorBody(value: unknown): GitHubWebhookErrorBody {
+  if (!isRecord(value) || !Array.isArray(value.errors)) {
+    return {};
+  }
+
+  const errors = value.errors.filter((item) => isGitHubWebhookError(item));
+  return { errors };
+}
+
+function isGitHubHook(value: unknown): value is GitHubHook {
+  if (!isRecord(value) || !isRecord(value.config)) {
+    return false;
+  }
+
+  const { id, config } = value;
+  return (
+    typeof id === "number" &&
+    (config.url === undefined || typeof config.url === "string")
+  );
+}
+
+function isGitHubHookArray(value: unknown): value is GitHubHook[] {
+  return Array.isArray(value) && value.every((hook) => isGitHubHook(hook));
+}
+
 async function getWebhookRecords(
   kv: KVNamespace,
   userId: string
@@ -194,10 +250,8 @@ webhooksRoute.post(
     );
 
     if (res.status === 422) {
-      const body = (await res.json()) as {
-        errors?: { resource: string; code: string; message: string }[];
-      };
-      const isAlreadyExists = body.errors?.some(
+      const errorBody = parseGitHubWebhookErrorBody(await res.json());
+      const isAlreadyExists = errorBody.errors?.some(
         (e) =>
           e.resource === "Hook" &&
           e.code === "custom" &&
@@ -218,11 +272,11 @@ webhooksRoute.post(
             }
           );
           if (hooksRes.ok) {
-            const hooks = (await hooksRes.json()) as {
-              id: number;
-              config: { url?: string };
-            }[];
-            const match = hooks.find(
+            const hooksPayload = await hooksRes.json();
+            if (!isGitHubHookArray(hooksPayload)) {
+              throw hooksPayload;
+            }
+            const match = hooksPayload.find(
               (h) => h.config.url === c.env.GITHUB_WEBHOOK_URL
             );
             existingHookId = match?.id ?? null;
@@ -233,7 +287,15 @@ webhooksRoute.post(
         await addWebhookRecord(c.env.WEBHOOK_KV, user.id, repo, existingHookId);
         return c.json({ ok: true, message: "webhookはすでに登録済みです" });
       }
-      return c.json({ ok: false, error: body }, 422);
+      return c.json(
+        {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "webhook登録に失敗しました"
+          }
+        },
+        422
+      );
     }
 
     if (!res.ok) {
@@ -250,9 +312,22 @@ webhooksRoute.post(
       );
     }
 
-    const hook = (await res.json()) as { id: number };
-    await addWebhookRecord(c.env.WEBHOOK_KV, user.id, repo, hook.id);
-    return c.json({ ok: true, hookId: hook.id }, 201);
+    const hookPayload = await res.json();
+    if (!isGitHubHook(hookPayload)) {
+      console.error("GitHub webhook 作成レスポンス不正:", hookPayload);
+      return c.json(
+        {
+          error: {
+            code: "GITHUB_API_ERROR",
+            message: "webhook登録に失敗しました"
+          }
+        },
+        502
+      );
+    }
+
+    await addWebhookRecord(c.env.WEBHOOK_KV, user.id, repo, hookPayload.id);
+    return c.json({ ok: true, hookId: hookPayload.id }, 201);
   }
 );
 

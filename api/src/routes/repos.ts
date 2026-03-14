@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { getSignedCookie } from "hono/cookie";
 import { describeRoute, resolver, validator } from "hono-openapi";
 import type { ReposResponse } from "@seedlog/schema";
@@ -17,6 +18,143 @@ type GitHubRepo = {
   description: string | null;
   updated_at: string;
 };
+
+type RepoListItem = ReposResponse["repos"][number];
+
+type GitHubReposPageResult =
+  | {
+      ok: true;
+      repos: RepoListItem[];
+      hasNextPage: boolean;
+    }
+  | {
+      ok: false;
+      status: number | "network" | "invalid_payload";
+      error?: unknown;
+    };
+
+const GITHUB_REPOS_SCAN_PER_PAGE = 100;
+const GITHUB_REPOS_SCAN_MAX_PAGES = 50;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isGitHubRepo(value: unknown): value is GitHubRepo {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.name === "string" &&
+    typeof value.full_name === "string" &&
+    typeof value.private === "boolean" &&
+    (typeof value.description === "string" || value.description === null) &&
+    typeof value.updated_at === "string"
+  );
+}
+
+function isGitHubRepoArray(value: unknown): value is GitHubRepo[] {
+  return Array.isArray(value) && value.every((repo) => isGitHubRepo(repo));
+}
+
+async function fetchGitHubReposPage(params: {
+  accessToken: string;
+  page: number;
+  perPage: number;
+}): Promise<GitHubReposPageResult> {
+  const { accessToken, page, perPage } = params;
+  const url = `https://api.github.com/user/repos?type=owner&sort=updated&per_page=${perPage}&page=${page}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "User-Agent": "seedlog-api",
+        Accept: "application/vnd.github+json"
+      }
+    });
+  } catch (error) {
+    return { ok: false, status: "network", error };
+  }
+
+  if (!res.ok) {
+    return { ok: false, status: res.status };
+  }
+
+  let payload: unknown;
+  try {
+    payload = await res.json();
+  } catch (error) {
+    return {
+      ok: false,
+      status: "invalid_payload",
+      error
+    };
+  }
+  if (!isGitHubRepoArray(payload)) {
+    return {
+      ok: false,
+      status: "invalid_payload",
+      error: payload
+    };
+  }
+
+  const repos = payload.map((repo) => ({
+    name: repo.name,
+    fullName: repo.full_name,
+    private: repo.private,
+    description: repo.description,
+    updatedAt: repo.updated_at
+  }));
+  const link = res.headers.get("Link") ?? "";
+  const hasNextPage = link.includes('rel="next"');
+
+  return { ok: true, repos, hasNextPage };
+}
+
+function githubReposErrorResponse(
+  c: Context<{ Bindings: CloudflareBindings }>,
+  status: number | "network" | "invalid_payload",
+  error?: unknown
+) {
+  if (status === "network" || status === "invalid_payload") {
+    console.error("GitHub repos fetch error:", error);
+    return c.json(
+      {
+        error: {
+          code: "GITHUB_API_ERROR",
+          message: "リポジトリ一覧の取得に失敗しました"
+        }
+      },
+      502
+    );
+  }
+
+  console.error("GitHub API error:", status);
+  if (status === 401 || status === 403) {
+    return c.json(
+      {
+        error: {
+          code: "GITHUB_AUTH_ERROR",
+          message: "GitHub認証に失敗しました。再度ログインしてください"
+        }
+      },
+      status
+    );
+  }
+
+  return c.json(
+    {
+      error: {
+        code: "GITHUB_API_ERROR",
+        message: "リポジトリ一覧の取得に失敗しました"
+      }
+    },
+    502
+  );
+}
 
 reposRoute.get(
   "/",
@@ -91,70 +229,75 @@ reposRoute.get(
       );
     }
 
-    const { page, per_page } = c.req.valid("query");
-    const url = `https://api.github.com/user/repos?type=owner&sort=updated&per_page=${per_page}&page=${page}`;
+    const { page, per_page, query } = c.req.valid("query");
 
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "User-Agent": "seedlog-api",
-          Accept: "application/vnd.github+json"
-        }
+    if (!query) {
+      const result = await fetchGitHubReposPage({
+        accessToken,
+        page,
+        perPage: per_page
       });
-    } catch (err) {
-      console.error("GitHub repos fetch error:", err);
-      return c.json(
-        {
-          error: {
-            code: "GITHUB_API_ERROR",
-            message: "リポジトリ一覧の取得に失敗しました"
-          }
-        },
-        502
-      );
-    }
-
-    if (!res.ok) {
-      console.error("GitHub API error:", res.status);
-      if (res.status === 401 || res.status === 403) {
-        return c.json(
-          {
-            error: {
-              code: "GITHUB_AUTH_ERROR",
-              message: "GitHub認証に失敗しました。再度ログインしてください"
-            }
-          },
-          res.status
-        );
+      if (!result.ok) {
+        return githubReposErrorResponse(c, result.status, result.error);
       }
-      return c.json(
-        {
-          error: {
-            code: "GITHUB_API_ERROR",
-            message: "リポジトリ一覧の取得に失敗しました"
-          }
-        },
-        502
-      );
+
+      c.header("Cache-Control", "private, no-store");
+      c.header("Vary", "Cookie");
+      return c.json({
+        repos: result.repos,
+        hasNextPage: result.hasNextPage
+      } satisfies ReposResponse);
     }
 
-    const rawRepos = (await res.json()) as GitHubRepo[];
-    const repos = rawRepos.map((r) => ({
-      name: r.name,
-      fullName: r.full_name,
-      private: r.private,
-      description: r.description,
-      updatedAt: r.updated_at
-    }));
+    const keyword = query.toLowerCase();
+    const startIndex = (page - 1) * per_page;
+    const endExclusive = startIndex + per_page;
+    let matchedCount = 0;
+    const repos: RepoListItem[] = [];
 
-    const link = res.headers.get("Link") ?? "";
-    const hasNextPage = link.includes('rel="next"');
+    let githubPage = 1;
+    let hasGitHubNextPage = true;
+
+    while (
+      hasGitHubNextPage &&
+      githubPage <= GITHUB_REPOS_SCAN_MAX_PAGES &&
+      matchedCount <= endExclusive
+    ) {
+      const result = await fetchGitHubReposPage({
+        accessToken,
+        page: githubPage,
+        perPage: GITHUB_REPOS_SCAN_PER_PAGE
+      });
+      if (!result.ok) {
+        return githubReposErrorResponse(c, result.status, result.error);
+      }
+
+      for (const repo of result.repos) {
+        const searchable =
+          `${repo.name} ${repo.fullName} ${repo.description ?? ""}`
+            .toLowerCase()
+            .trim();
+
+        if (!searchable.includes(keyword)) {
+          continue;
+        }
+
+        matchedCount += 1;
+        if (matchedCount > startIndex && repos.length < per_page + 1) {
+          repos.push(repo);
+        }
+      }
+
+      hasGitHubNextPage = result.hasNextPage;
+      githubPage += 1;
+    }
+
+    const hasNextPage = repos.length > per_page;
+    const pageRepos = repos.slice(0, per_page);
 
     c.header("Cache-Control", "private, no-store");
     c.header("Vary", "Cookie");
-    return c.json({ repos, hasNextPage } satisfies ReposResponse);
+    return c.json({ repos: pageRepos, hasNextPage } satisfies ReposResponse);
   }
 );
 
