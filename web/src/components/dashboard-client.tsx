@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useCallback } from 'react'
-import useSWR, { mutate } from 'swr'
-import { DashboardHeader } from '@/components/dashboard-header'
-import { LogForm } from '@/components/log-form'
-import { LogList } from '@/components/log-list'
-import { AIPanel } from '@/components/ai-panel'
-import { fetcher } from '@/lib/api'
+import { useState, useCallback } from "react";
+import useSWR, { mutate } from "swr";
+import { DashboardHeader } from "@/components/dashboard-header";
+import { LogForm } from "@/components/log-form";
+import { LogList } from "@/components/log-list";
+import { AIPanel } from "@/components/ai-panel";
+import { fetcher } from "@/lib/api";
 import { RepoSelectorPanel } from "@/components/repo-selector-panel";
 
 // バックエンドのスキーマに合わせた型定義
@@ -26,7 +26,6 @@ interface LogsResponse {
 }
 
 export function DashboardClient() {
-
   // バックエンドの /api/logs からデータを取得
   const { data } = useSWR<LogsResponse>("/api/logs", fetcher, {
     onError: (err) => console.warn("API fetch failed:", err.message)
