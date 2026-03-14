@@ -83,7 +83,16 @@ async function fetchGitHubReposPage(params: {
     return { ok: false, status: res.status };
   }
 
-  const payload = await res.json();
+  let payload: unknown;
+  try {
+    payload = await res.json();
+  } catch (error) {
+    return {
+      ok: false,
+      status: "invalid_payload",
+      error
+    };
+  }
   if (!isGitHubRepoArray(payload)) {
     return {
       ok: false,
