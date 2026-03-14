@@ -48,7 +48,7 @@ Discord REST API を叩いてユーザーにDMを送る
 Cloudflare Worker が返信を受け取りDBに保存
 ```
 
-※ `logs` には `repo`（`owner/repo`）を保持し、質問起点の返信ログは `questions.githubRepo` を引き継ぐ。
+※ `logs` はリポジトリ文脈（`owner/repo`）を保持する。
 
 ※ エピソード生成結果は `episodes` テーブルに永続化する。
 
