@@ -1,74 +1,80 @@
-import { useState } from 'react'
-import useSWR, { mutate } from 'swr'
-import { Bell } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useState } from "react";
+import useSWR, { mutate } from "swr";
+import { Bell } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import { fetcher, apiFetch } from '@/lib/api'
+  PopoverTrigger
+} from "@/components/ui/popover";
+import { fetcher, apiFetch } from "@/lib/api";
 
 // DashboardClient等で使っている型定義
 export interface Notification {
-  id: string
-  type: string
-  title: string
-  message: string
-  metadata: any
-  is_read: boolean
-  created_at: string
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  metadata: any;
+  is_read: boolean;
+  created_at: string;
 }
 
 interface NotificationPanelProps {
-  onCreateLogFromPush?: (notification: Notification) => void
+  onCreateLogFromPush?: (notification: Notification) => void;
 }
 
-export function NotificationPanel({ onCreateLogFromPush }: NotificationPanelProps) {
-  const [isOpen, setIsOpen] = useState(false)
+export function NotificationPanel({
+  onCreateLogFromPush
+}: NotificationPanelProps) {
+  const [isOpen, setIsOpen] = useState(false);
 
   // ▼ バックエンドの通知（または AIからの問いかけ）取得用エンドポイント
   // ※バックエンドの schema.ts にある `questions` テーブルから未回答のものを取得する
   // API（例: /api/notifications や /api/questions）を指定してください。
-  const { data: notifications = [] } = useSWR<Notification[]>('/api/notifications', fetcher, {
-    fallbackData: [],
-    // ポーリングして新しい通知がないか定期チェックする場合は以下のオプションを有効にします
-    // refreshInterval: 60000, // 1分ごとにチェック
-    onError: (err) => console.warn('Notifications fetch failed:', err.message)
-  })
+  const { data: notifications = [] } = useSWR<Notification[]>(
+    "/api/notifications",
+    fetcher,
+    {
+      fallbackData: [],
+      // ポーリングして新しい通知がないか定期チェックする場合は以下のオプションを有効にします
+      // refreshInterval: 60000, // 1分ごとにチェック
+      onError: (err) => console.warn("Notifications fetch failed:", err.message)
+    }
+  );
 
   // 未読数のカウント
-  const unreadCount = notifications.filter((n) => !n.is_read).length
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   // 通知をクリックして既読にする処理
   const handleMarkAsRead = async (id: string) => {
     try {
       // 楽観的UI更新：APIの返事を待たずに、画面上だけ先に既読（is_read: true）にする
       mutate(
-        '/api/notifications',
+        "/api/notifications",
         notifications.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
         false
-      )
-      
+      );
+
       // バックエンドへ既読フラグを送信（ご自身のAPIエンドポイントに合わせてください）
-      await apiFetch(`/api/notifications/${id}/read`, { method: 'POST' })
-      
+      await apiFetch(`/api/notifications/${id}/read`, { method: "POST" });
+
       // 念のため最新のデータを再取得
-      mutate('/api/notifications')
+      mutate("/api/notifications");
     } catch (error) {
-      console.error('Failed to mark as read:', error)
+      console.error("Failed to mark as read:", error);
     }
-  }
+  };
 
   // 通知アイテムをクリックしたときの挙動
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.is_read) {
-      handleMarkAsRead(notification.id)
+      handleMarkAsRead(notification.id);
     }
-    setIsOpen(false)
+    setIsOpen(false);
     // ダッシュボード側のフォームに値を流し込む
-    onCreateLogFromPush?.(notification)
-  }
+    onCreateLogFromPush?.(notification);
+  };
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -81,8 +87,11 @@ export function NotificationPanel({ onCreateLogFromPush }: NotificationPanelProp
           )}
         </Button>
       </PopoverTrigger>
-      
-      <PopoverContent align="end" className="w-80 p-0 shadow-lg border-border/50 bg-card/95 backdrop-blur">
+
+      <PopoverContent
+        align="end"
+        className="w-80 p-0 shadow-lg border-border/50 bg-card/95 backdrop-blur"
+      >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <h3 className="font-semibold text-sm">通知</h3>
           {unreadCount > 0 && (
@@ -91,12 +100,14 @@ export function NotificationPanel({ onCreateLogFromPush }: NotificationPanelProp
             </span>
           )}
         </div>
-        
-        <div className="max-h-100px overflow-y-auto">
+
+        <div className="max-h-25 overflow-y-auto">
           {notifications.length === 0 ? (
             <div className="p-8 text-center flex flex-col items-center justify-center gap-2">
               <Bell className="h-8 w-8 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">新しい通知はありません</p>
+              <p className="text-sm text-muted-foreground">
+                新しい通知はありません
+              </p>
             </div>
           ) : (
             <div className="flex flex-col">
@@ -105,24 +116,28 @@ export function NotificationPanel({ onCreateLogFromPush }: NotificationPanelProp
                   key={notification.id}
                   onClick={() => handleNotificationClick(notification)}
                   className={`flex flex-col gap-1 p-4 text-left transition-colors border-b border-border/50 last:border-0 ${
-                    !notification.is_read 
-                      ? 'bg-primary/5 hover:bg-primary/10' 
-                      : 'hover:bg-muted/50'
+                    !notification.is_read
+                      ? "bg-primary/5 hover:bg-primary/10"
+                      : "hover:bg-muted/50"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2 w-full">
-                    <span className={`text-sm leading-tight ${!notification.is_read ? 'font-semibold text-foreground' : 'font-medium text-muted-foreground'}`}>
+                    <span
+                      className={`text-sm leading-tight ${!notification.is_read ? "font-semibold text-foreground" : "font-medium text-muted-foreground"}`}
+                    >
                       {notification.title}
                     </span>
                     {!notification.is_read && (
                       <span className="h-2 w-2 rounded-full bg-primary shrink-0 mt-1" />
                     )}
                   </div>
-                  <span className={`text-xs line-clamp-2 mt-1 ${!notification.is_read ? 'text-muted-foreground' : 'text-muted-foreground/70'}`}>
+                  <span
+                    className={`text-xs line-clamp-2 mt-1 ${!notification.is_read ? "text-muted-foreground" : "text-muted-foreground/70"}`}
+                  >
                     {notification.message}
                   </span>
                   <span className="text-[10px] text-muted-foreground/50 mt-2 font-mono">
-                    {new Date(notification.created_at).toLocaleString('ja-JP')}
+                    {new Date(notification.created_at).toLocaleString("ja-JP")}
                   </span>
                 </button>
               ))}
@@ -131,5 +146,5 @@ export function NotificationPanel({ onCreateLogFromPush }: NotificationPanelProp
         </div>
       </PopoverContent>
     </Popover>
-  )
+  );
 }
