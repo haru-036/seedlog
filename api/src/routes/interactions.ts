@@ -57,6 +57,7 @@ const RESPONSE_TYPE = {
 
 const DISCORD_MESSAGE_MAX_LENGTH = 2000;
 const EPHEMERAL_FLAG = 64;
+const DISCORD_API = "https://discord.com/api/v10";
 
 function ephemeralMessage(content: string) {
   return {
@@ -72,6 +73,25 @@ function truncateForDiscordMessage(content: string): string {
 
   const suffix = "\n\n...（文字数上限のため一部省略しました）";
   return content.slice(0, DISCORD_MESSAGE_MAX_LENGTH - suffix.length) + suffix;
+}
+
+async function sendInteractionFollowup(
+  applicationId: string,
+  interactionToken: string,
+  content: string
+): Promise<void> {
+  const res = await fetch(
+    `${DISCORD_API}/webhooks/${applicationId}/${interactionToken}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content, flags: EPHEMERAL_FLAG })
+    }
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Discord follow-up error ${res.status}: ${text}`);
+  }
 }
 
 const REPLY_MODAL_COMPONENTS = (customId: string) => ({
@@ -195,48 +215,86 @@ interactionsRoute.post("/", async (c) => {
         );
       }
 
-      const db = createDb(c.env.DB);
-      const user = await db
-        .select()
-        .from(users)
-        .where(eq(users.discordId, discordUserId))
-        .get();
-      if (!user) {
+      const applicationId = interaction.application_id;
+      const interactionToken = interaction.token;
+      if (!applicationId || !interactionToken) {
         return c.json(
           ephemeralMessage(
-            "ユーザーが見つかりませんでした。まず `/register` でユーザー登録してください。"
+            "Discord情報が不足しているため処理できませんでした。しばらくしてから再試行してください。"
           )
         );
       }
 
-      const userLogs = await db
-        .select({ content: logs.content, createdAt: logs.createdAt })
-        .from(logs)
-        .where(eq(logs.userId, user.id))
-        .orderBy(logs.createdAt, logs.id)
-        .all();
-      if (userLogs.length === 0) {
-        return c.json(
-          ephemeralMessage(
-            "ログがまだありません。`/log` でログを記録してからお試しください。"
-          )
-        );
-      }
+      c.executionCtx.waitUntil(
+        (async () => {
+          try {
+            const db = createDb(c.env.DB);
+            const user = await db
+              .select()
+              .from(users)
+              .where(eq(users.discordId, discordUserId))
+              .get();
+            if (!user) {
+              await sendInteractionFollowup(
+                applicationId,
+                interactionToken,
+                "ユーザーが見つかりませんでした。まず `/register` でユーザー登録してください。"
+              );
+              return;
+            }
 
-      const episode = await generateEpisode(
-        c.env.GEMINI_API_KEY,
-        userLogs.map((log) => log.content),
-        prompt
+            const userLogs = await db
+              .select({ content: logs.content, createdAt: logs.createdAt })
+              .from(logs)
+              .where(eq(logs.userId, user.id))
+              .orderBy(logs.createdAt, logs.id)
+              .all();
+            if (userLogs.length === 0) {
+              await sendInteractionFollowup(
+                applicationId,
+                interactionToken,
+                "ログがまだありません。`/log` でログを記録してからお試しください。"
+              );
+              return;
+            }
+
+            const episode = await generateEpisode(
+              c.env.GEMINI_API_KEY,
+              userLogs.map((log) => log.content),
+              prompt
+            );
+
+            await db.insert(episodes).values({
+              id: nanoid(),
+              userId: user.id,
+              prompt,
+              content: episode
+            });
+
+            await sendInteractionFollowup(
+              applicationId,
+              interactionToken,
+              truncateForDiscordMessage(episode)
+            );
+          } catch (err) {
+            console.error("episode_command: エラー", err);
+            try {
+              await sendInteractionFollowup(
+                applicationId,
+                interactionToken,
+                "エピソード生成中にエラーが発生しました。しばらくしてから再試行してください。"
+              );
+            } catch (followupErr) {
+              console.error(
+                "episode_command: フォローアップ送信エラー",
+                followupErr
+              );
+            }
+          }
+        })()
       );
 
-      await db.insert(episodes).values({
-        id: nanoid(),
-        userId: user.id,
-        prompt,
-        content: episode
-      });
-
-      return c.json(ephemeralMessage(truncateForDiscordMessage(episode)));
+      return c.json(ephemeralMessage("エピソードを生成中です…"));
     }
   }
 
