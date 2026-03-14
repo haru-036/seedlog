@@ -156,7 +156,13 @@ async function findPrAuthorLogin(params: {
     return null;
   }
 
-  const raw = await res.json();
+  let raw: unknown;
+  try {
+    raw = await res.json();
+  } catch {
+    console.warn(`PR解決APIレスポンスパース失敗: repo=${repoFullName}`);
+    return null;
+  }
   const prs = parseGitHubPullRequests(raw);
   if (!prs || prs.length === 0) {
     return null;
