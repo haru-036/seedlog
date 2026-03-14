@@ -19,8 +19,16 @@ export type UserResponse = z.infer<typeof userResponseSchema>;
 
 // ---- GitHub Webhook ----
 
+const githubCommitActorSchema = z.object({
+  name: z.string().optional(),
+  email: z.string().optional(),
+  username: z.string().optional()
+});
+
 const githubCommitSchema = z.object({
   id: z.string(),
+  author: githubCommitActorSchema.optional(),
+  committer: githubCommitActorSchema.optional(),
   added: z.array(z.string()).default([]),
   modified: z.array(z.string()).default([]),
   removed: z.array(z.string()).default([])
@@ -148,13 +156,13 @@ export const logResponseSchema = z.object({
   id: z.string(),
   userId: z.string(),
   questionId: z.string().nullable(),
+  repo: z.string().nullable(),
   content: z.string(),
   source: logSourceSchema,
   createdAt: z.string()
 });
 
 export const logsQuerySchema = z.object({
-  userId: z.string().min(1, "userIdは必須です"),
   source: logSourceSchema.optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0)
@@ -174,7 +182,6 @@ export type LogsListResponse = z.infer<typeof logsListResponseSchema>;
 // ---- Episodes ----
 
 export const episodeRequestSchema = z.object({
-  userId: z.string().min(1, "userIdは必須です"),
   prompt: z.string().min(1, "promptは必須です")
 });
 
@@ -208,7 +215,9 @@ export const reposQuerySchema = z.object({
 
 export const reposResponseSchema = z.object({
   repos: z.array(repoSchema),
-  hasNextPage: z.boolean()
+  hasNextPage: z.boolean(),
+  incomplete: z.boolean().optional(),
+  message: z.string().optional()
 });
 
 export const webhooksListResponseSchema = z.object({

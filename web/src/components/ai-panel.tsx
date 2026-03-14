@@ -12,7 +12,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
 import { Lightbulb, FileText, TrendingUp, Sparkles } from "lucide-react";
-import type { Log } from "@/components/dashboard-client";
+import type { LogResponse } from "@seedlog/schema";
 import { apiFetch } from "@/lib/api";
 
 type AIType = "lt" | "es" | "growth";
@@ -46,7 +46,7 @@ interface GrowthAnalysis {
 
 // Propsの型を定義
 interface AIPanelProps {
-  logs: Log[];
+  logs: LogResponse[];
 }
 
 export function AIPanel({ logs }: AIPanelProps) {

@@ -7,6 +7,7 @@ import {
   setSignedCookie
 } from "hono/cookie";
 import { zValidator } from "@hono/zod-validator";
+import { describeRoute, resolver } from "hono-openapi";
 import { drizzle } from "drizzle-orm/d1";
 import { eq, lt } from "drizzle-orm";
 import { nanoid } from "nanoid";
@@ -14,11 +15,13 @@ import {
   discordCallbackQuerySchema,
   discordDmStatusSchema,
   type DiscordDmStatus,
-  githubCallbackQuerySchema
+  githubCallbackQuerySchema,
+  userResponseSchema
 } from "@seedlog/schema";
 import { oauthCodes, users } from "../db/schema";
 import { encryptToken } from "../lib/token-crypto";
 import { createDMChannel, sendDMMessage } from "../lib/discord";
+import { resolveCurrentUser } from "../lib/current-user";
 
 const authRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -29,6 +32,20 @@ const DISCORD_USER_GUILDS_URL = "https://discord.com/api/users/@me/guilds";
 
 const ADMINISTRATOR_PERMISSION = 0x8n;
 const MANAGE_GUILD_PERMISSION = 0x20n;
+
+function toUserResponse(user: {
+  id: string;
+  discordId: string | null;
+  githubLogin: string;
+  createdAt: Date;
+}) {
+  return userResponseSchema.parse({
+    id: user.id,
+    discordId: user.discordId,
+    githubLogin: user.githubLogin,
+    createdAt: user.createdAt.toISOString()
+  });
+}
 
 function generateState(): string {
   const bytes = new Uint8Array(32);
@@ -135,6 +152,43 @@ async function testDmDeliverability(
     });
   }
 }
+
+authRoute.get(
+  "/me",
+  describeRoute({
+    description: "現在ログイン中のユーザー情報を取得する",
+    tags: ["Auth"],
+    responses: {
+      200: {
+        description: "現在のユーザー情報",
+        content: {
+          "application/json": { schema: resolver(userResponseSchema) }
+        }
+      },
+      401: { description: "未認証" },
+      404: { description: "ユーザーが見つからない" }
+    }
+  }),
+  async (c) => {
+    const currentUser = await resolveCurrentUser(c);
+
+    if (!currentUser.githubLogin) {
+      return c.json(
+        { error: { code: "UNAUTHORIZED", message: "認証が必要です" } },
+        401
+      );
+    }
+
+    if (!currentUser.user) {
+      return c.json(
+        { error: { code: "NOT_FOUND", message: "ユーザーが見つかりません" } },
+        404
+      );
+    }
+
+    return c.json(toUserResponse(currentUser.user));
+  }
+);
 
 authRoute.get("/discord", async (c) => {
   // githubLogin はクライアントから受け取らず、サーバー側の署名済み Cookie から取得

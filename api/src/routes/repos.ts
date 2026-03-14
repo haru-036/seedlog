@@ -35,6 +35,8 @@ type GitHubReposPageResult =
 
 const GITHUB_REPOS_SCAN_PER_PAGE = 100;
 const GITHUB_REPOS_SCAN_MAX_PAGES = 50;
+const GITHUB_REPOS_SCAN_MAX_ITEMS =
+  GITHUB_REPOS_SCAN_PER_PAGE * GITHUB_REPOS_SCAN_MAX_PAGES;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -64,7 +66,7 @@ async function fetchGitHubReposPage(params: {
   perPage: number;
 }): Promise<GitHubReposPageResult> {
   const { accessToken, page, perPage } = params;
-  const url = `https://api.github.com/user/repos?type=owner&sort=updated&per_page=${perPage}&page=${page}`;
+  const url = `https://api.github.com/user/repos?affiliation=owner,collaborator,organization_member&sort=updated&per_page=${perPage}&page=${page}`;
 
   let res: Response;
   try {
@@ -254,6 +256,7 @@ reposRoute.get(
     const endExclusive = startIndex + per_page;
     let matchedCount = 0;
     const repos: RepoListItem[] = [];
+    let scannedItems = 0;
 
     let githubPage = 1;
     let hasGitHubNextPage = true;
@@ -271,6 +274,7 @@ reposRoute.get(
       if (!result.ok) {
         return githubReposErrorResponse(c, result.status, result.error);
       }
+      scannedItems += result.repos.length;
 
       for (const repo of result.repos) {
         const searchable =
@@ -294,10 +298,23 @@ reposRoute.get(
 
     const hasNextPage = repos.length > per_page;
     const pageRepos = repos.slice(0, per_page);
+    const truncatedByScanLimit =
+      hasGitHubNextPage && githubPage > GITHUB_REPOS_SCAN_MAX_PAGES;
+    const truncatedByGitHubCap =
+      hasGitHubNextPage && scannedItems >= GITHUB_REPOS_SCAN_MAX_ITEMS;
+    const incomplete = truncatedByScanLimit || truncatedByGitHubCap;
+    const message = incomplete
+      ? `検索対象が上限(${GITHUB_REPOS_SCAN_MAX_ITEMS}件)に達したため、結果が一部のみ表示されています`
+      : undefined;
 
     c.header("Cache-Control", "private, no-store");
     c.header("Vary", "Cookie");
-    return c.json({ repos: pageRepos, hasNextPage } satisfies ReposResponse);
+    return c.json({
+      repos: pageRepos,
+      hasNextPage,
+      incomplete,
+      message
+    } satisfies ReposResponse);
   }
 );
 

@@ -48,6 +48,10 @@ Discord REST API を叩いてユーザーにDMを送る
 Cloudflare Worker が返信を受け取りDBに保存
 ```
 
+※ `logs` はリポジトリ文脈（`owner/repo`）を保持する。
+
+※ エピソード生成結果は `episodes` テーブルに永続化する。
+
 ### ユーザー認証フロー（GitHub OAuth）
 
 ```

@@ -2,9 +2,9 @@
 
 ベースURL: `https://seedlog-api.harurahu.workers.dev`
 
-`🔒` のついているエンドポイントはリクエストに `userId` が必要（query parameter or request body）。
+`🔒` のついているエンドポイントは署名付き Cookie (`github_user`) による認証が必要。
 
-> **認証について**: GitHub OAuth と Discord OAuth で連携・登録。`🔒` のエンドポイントは `userId` が必要。
+> **認証について**: GitHub OAuth と Discord OAuth で連携・登録。`🔒` のエンドポイントは `github_user` Cookie に基づいて current user を解決する。
 
 ---
 
@@ -89,7 +89,8 @@ X-GitHub-Event: push
 1. `X-Hub-Signature-256` で HMAC-SHA256 署名を検証（`GITHUB_WEBHOOK_SECRET`）
 2. `push` 以外のイベントは無視して 200 を返す
 3. `pusher.name`（githubLogin）でユーザーを検索（未登録ユーザーは無視）
-4. コミットの `added` + `modified` ファイル一覧を抽出し questions テーブルに保存
+4. push内の `author` / `committer` / `pusher` を見て、対象ユーザーが関与した変更のみ処理
+5. コミットの `added` + `modified` ファイル一覧を抽出し questions テーブルに保存
 
 > `questionText` は現在 `"AI生成予定"` のプレースホルダー。#4 AI質問生成実装後に差し替え予定。
 
@@ -217,6 +218,26 @@ error?: string
 
 - `302 Redirect` → `${FRONTEND_URL}/auth/github/callback?githubLogin=<login>`
 
+### `GET /api/auth/me` ✅ 実装済み 🔒
+
+現在ログイン中ユーザーを取得する。
+
+**Response** `200 OK`
+
+```typescript
+{
+  id: string;
+  discordId: string | null;
+  githubLogin: string;
+  createdAt: string; // ISO 8601
+}
+```
+
+**Error Responses**
+
+- `401 Unauthorized` — `github_user` Cookie が未設定または不正
+- `404 Not Found` — Cookie に対応するユーザーが存在しない
+
 **エラーレスポンス**
 
 - `302 Redirect` → `${FRONTEND_URL}/auth/error?reason=<reason>`
@@ -255,14 +276,17 @@ error?: string
   }
   [];
   hasNextPage: boolean; // 次のページが存在するか
+  incomplete?: boolean; // true の場合は検索結果が上限で打ち切られている
+  message?: string; // incomplete=true のときの補足メッセージ
 }
 ```
 
 **取得条件**
 
-- type=owner（自分がオーナーのリポジトリのみ）
+- affiliation=owner,collaborator,organization_member（オーナー・コラボレータ・組織所属リポジトリ）
 - sort=updated（最終更新順）
 - `query` 指定時は `name` / `fullName` / `description` を対象にサーバー側で部分一致検索し、検索結果に対して `page` / `per_page` を適用
+- `query` 指定時の走査は最大 5000 件（100件 × 50ページ）。上限に達しても続きがある場合、`incomplete: true` が返る
 
 **Error Responses**
 
@@ -391,7 +415,7 @@ X-Signature-Timestamp: <timestamp>
 1. Ed25519署名を検証（`DISCORD_PUBLIC_KEY`）
 2. `PING` に `PONG` を返す（Discord Endpoint URL検証用）
 3. ボタンクリック（`open_reply_modal:<questionId>`）→ 振り返りモーダルを表示
-4. モーダル送信（`question_reply:<questionId>`）→ logsテーブルに保存（`source: 'discord_reply'`）、questionの`answeredAt`を更新
+4. モーダル送信（`question_reply:<questionId>`）→ logsテーブルに保存（`source: 'discord_reply'`、`repo` は question の `githubRepo` を引き継ぐ）、questionの`answeredAt`を更新
 5. `/log` コマンドのモーダル送信（`log_entry`）→ logsテーブルに保存（`source: 'discord_command'`）
 
 **Error Responses**
@@ -412,7 +436,6 @@ X-Signature-Timestamp: <timestamp>
 **Query Parameters**
 
 ```
-userId: string（必須）
 source?: 'github_push' | 'discord_reply' | 'discord_command' | 'web'
 limit?: number（デフォルト20）
 offset?: number
@@ -426,6 +449,7 @@ offset?: number
     id: string;
     userId: string;
     questionId: string | null;
+    repo: string | null; // "owner/repo"（手動ログは null）
     content: string;
     source: "github_push" | "discord_reply" | "discord_command" | "web";
     createdAt: string; // ISO 8601
@@ -482,7 +506,6 @@ offset?: number
 
 ```typescript
 {
-  userId: string;
   prompt: string; // 例: "LTネタまとめて"、"今月の成長まとめて"
 }
 ```
@@ -497,10 +520,11 @@ offset?: number
 
 **処理の流れ**
 
-1. userId でユーザーを検索
+1. `github_user` Cookie から current user を解決
 2. そのユーザーの全ログを取得（`createdAt` 昇順）
 3. ログ内容 + ユーザーのプロンプトを Gemini に渡して要約生成
-4. 生成結果を返す（Gemini エラー時はフォールバックメッセージを返す）
+4. 生成結果を `episodes` テーブルへ保存（`userId`, `prompt`, `content`）
+5. 生成結果を返す（Gemini エラー時はフォールバックメッセージを返す）
 
 **必要な環境変数**
 
@@ -508,7 +532,7 @@ offset?: number
 
 **Error Responses**
 
-- `404 Not Found` — ユーザーが見つからない
+- `401 Unauthorized` — 未認証
 - `422 Unprocessable Entity` — ログが0件
   ```json
   {

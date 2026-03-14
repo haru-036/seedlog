@@ -9,6 +9,34 @@ import { questions, users } from "../db/schema";
 
 const githubRoute = new Hono<{ Bindings: CloudflareBindings }>();
 
+function isUserInvolvedInPush(params: {
+  githubLogin: string;
+  pusherName: string;
+  commits: Array<{
+    author?: { username?: string; name?: string };
+    committer?: { username?: string; name?: string };
+  }>;
+}): boolean {
+  const normalizedLogin = params.githubLogin.toLowerCase();
+  const normalizedPusher = params.pusherName.toLowerCase();
+  if (normalizedPusher === normalizedLogin) {
+    return true;
+  }
+
+  return params.commits.some((commit) => {
+    const candidateNames = [
+      commit.author?.username,
+      commit.author?.name,
+      commit.committer?.username,
+      commit.committer?.name
+    ]
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.toLowerCase());
+
+    return candidateNames.includes(normalizedLogin);
+  });
+}
+
 async function verifySignature(
   secret: string,
   body: string,
@@ -98,6 +126,16 @@ githubRoute.post("/github", async (c) => {
     .where(eq(users.githubLogin, pusher.name))
     .get();
   if (!user) {
+    return c.json({ ok: true });
+  }
+
+  if (
+    !isUserInvolvedInPush({
+      githubLogin: user.githubLogin,
+      pusherName: pusher.name,
+      commits
+    })
+  ) {
     return c.json({ ok: true });
   }
 

@@ -10,11 +10,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import type { LogResponse } from "@seedlog/schema";
 import { apiFetch } from "@/lib/api";
-import type { Log } from "./dashboard-client";
 
 interface LogCardProps {
-  log: Log;
+  log: LogResponse;
   onDeleted?: (id: string) => void;
 }
 
