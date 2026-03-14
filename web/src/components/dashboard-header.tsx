@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { API_BASE } from "../lib/api";
 
 // 通知データの型定義
-export default function DashboardHeader() {
+export function DashboardHeader() {
   const [githubLogin, setGithubLogin] = useState<string | null>(null);
   const [discordUsername, setDiscordUsername] = useState<string | null>(null);
   const [_discordBotInstallFlag, setDiscordBotInstallFlag] = useState<
