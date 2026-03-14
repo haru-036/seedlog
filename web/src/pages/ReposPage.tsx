@@ -15,6 +15,7 @@ type WebhookStatus =
   | "unregistering"
   | "done"
   | "exists"
+  | "pending"
   | "error";
 
 function RepoItem({
@@ -51,7 +52,12 @@ function RepoItem({
       }
 
       const data = parsed.data;
-      const newStatus = data.message?.includes("すでに") ? "exists" : "done";
+      const newStatus =
+        data.message === "no_admin_access"
+          ? "pending"
+          : data.message?.includes("すでに")
+            ? "exists"
+            : "done";
       setStatus(newStatus);
       await mutate("/api/webhooks");
     } catch (err) {
@@ -143,6 +149,22 @@ function RepoItem({
             >
               解除
             </button>
+          </div>
+        )}
+        {status === "pending" && (
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-yellow-400">⏳ 設定待ち</span>
+              <button
+                onClick={unregisterWebhook}
+                className="text-sm bg-neutral-800 text-neutral-200 px-3 py-1.5 rounded hover:bg-neutral-700 transition-colors"
+              >
+                解除
+              </button>
+            </div>
+            <p className="text-xs text-neutral-400">
+              オーナーの Webhook 設定後に有効になります
+            </p>
           </div>
         )}
         {status === "error" && (

@@ -298,6 +298,20 @@ webhooksRoute.post(
       );
     }
 
+    // 403/404: リポジトリへの管理者権限がない場合（コントリビューターなど）
+    // GitHub Webhook の作成には管理者権限が必要なため、ここでは KV のみ登録する。
+    // hookId=null で登録されるため unregister 時は GitHub API を呼び出さない。
+    // プッシュ通知は github.ts の push ハンドラーが pusher.name でユーザーを特定して
+    // 配信するため、KV 登録のみで通知は機能する（リポジトリオーナーが webhook を
+    // 設定済みであることが前提）。
+    if (res.status === 403 || res.status === 404) {
+      console.warn(
+        `GitHub webhook 作成: 権限なし (status=${res.status}) repo=${repo} user=${githubLogin}`
+      );
+      await addWebhookRecord(c.env.WEBHOOK_KV, user.id, repo, null);
+      return c.json({ ok: true, message: "no_admin_access" });
+    }
+
     if (!res.ok) {
       const text = await res.text();
       console.error("GitHub webhook 登録エラー:", text);
