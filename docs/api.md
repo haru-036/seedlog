@@ -276,6 +276,8 @@ error?: string
   }
   [];
   hasNextPage: boolean; // 次のページが存在するか
+  incomplete?: boolean; // true の場合は検索結果が上限で打ち切られている
+  message?: string; // incomplete=true のときの補足メッセージ
 }
 ```
 
@@ -284,6 +286,7 @@ error?: string
 - affiliation=owner,collaborator,organization_member（オーナー・コラボレータ・組織所属リポジトリ）
 - sort=updated（最終更新順）
 - `query` 指定時は `name` / `fullName` / `description` を対象にサーバー側で部分一致検索し、検索結果に対して `page` / `per_page` を適用
+- `query` 指定時の走査は最大 5000 件（100件 × 50ページ）。上限に達しても続きがある場合、`incomplete: true` が返る
 
 **Error Responses**
 

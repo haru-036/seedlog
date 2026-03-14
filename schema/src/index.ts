@@ -215,7 +215,9 @@ export const reposQuerySchema = z.object({
 
 export const reposResponseSchema = z.object({
   repos: z.array(repoSchema),
-  hasNextPage: z.boolean()
+  hasNextPage: z.boolean(),
+  incomplete: z.boolean().optional(),
+  message: z.string().optional()
 });
 
 export const webhooksListResponseSchema = z.object({

@@ -32,6 +32,8 @@ logsRoute.get(
     const currentUser = await resolveCurrentUser(c);
 
     if (!currentUser.user) {
+      c.header("Cache-Control", "private, no-store");
+      c.header("Vary", "Cookie");
       return c.json(
         { error: { code: "UNAUTHORIZED", message: "認証が必要です" } },
         401
@@ -58,6 +60,8 @@ logsRoute.get(
 
     const total = totalResult?.total ?? 0;
 
+    c.header("Cache-Control", "private, no-store");
+    c.header("Vary", "Cookie");
     return c.json({
       logs: rows.map((row) =>
         logResponseSchema.parse({
