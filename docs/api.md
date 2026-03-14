@@ -88,11 +88,13 @@ X-GitHub-Event: push
 
 1. `X-Hub-Signature-256` で HMAC-SHA256 署名を検証（`GITHUB_WEBHOOK_SECRET`）
 2. `push` 以外のイベントは無視して 200 を返す
-3. `pusher.name`（githubLogin）でユーザーを検索（未登録ユーザーは無視）
-4. push内の `author` / `committer` / `pusher` を見て、対象ユーザーが関与した変更のみ処理
-5. コミットの `added` + `modified` ファイル一覧を抽出し questions テーブルに保存
+3. `ref !== refs/heads/main` は無視する
+4. main の `head_commit` から、GitHub API (`commits/{sha}/pulls`) で関連 PR を解決する
+5. PR が解決できた場合は PR 作者（`pull_request.user.login`）を通知対象にする
+6. PR が解決できない場合は `pusher.name` を通知対象にする
+7. コミットの `added` + `modified` ファイル一覧を抽出し questions テーブルに保存
 
-> `questionText` は現在 `"AI生成予定"` のプレースホルダー。#4 AI質問生成実装後に差し替え予定。
+> GitHub API が一時的に失敗しても webhook の処理自体は継続し、`pusher.name` フォールバックで通知対象を決定する。
 
 **Error Responses**
 
