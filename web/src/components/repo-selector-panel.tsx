@@ -9,6 +9,7 @@ import { webhookMutationResponseSchema } from "@seedlog/schema";
 import {
   AlertTriangle,
   CheckCircle2,
+  Clock,
   Globe,
   Lock,
   PanelsRightBottom,
@@ -33,6 +34,7 @@ type RowStatus =
   | "unregistering"
   | "done"
   | "exists"
+  | "pending"
   | "error";
 
 function RepoRow({
@@ -68,7 +70,13 @@ function RepoRow({
         return;
       }
 
-      setStatus(parsed.data.message?.includes("すでに") ? "exists" : "done");
+      setStatus(
+        parsed.data.message === "no_admin_access"
+          ? "pending"
+          : parsed.data.message?.includes("すでに")
+            ? "exists"
+            : "done"
+      );
       await mutate("/api/webhooks");
     } catch (err) {
       console.error("Webhook登録中に例外が発生しました", err);
@@ -115,7 +123,10 @@ function RepoRow({
   }
 
   const effectiveRegistered =
-    status === "done" || status === "exists" || isRegistered;
+    status === "done" ||
+    status === "exists" ||
+    status === "pending" ||
+    isRegistered;
 
   return (
     <li className="grid grid-cols-[1fr_auto] gap-3 border-b border-border/60 py-3 last:border-b-0">
@@ -165,7 +176,9 @@ function RepoRow({
             </Button>
           )}
 
-        {(status === "done" || status === "exists" || effectiveRegistered) &&
+        {(status === "done" ||
+          status === "exists" ||
+          (effectiveRegistered && status !== "pending")) &&
           status !== "unregistering" && (
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -183,6 +196,29 @@ function RepoRow({
               </Button>
             </div>
           )}
+
+        {status === "pending" && (
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 text-xs text-yellow-500">
+                <Clock className="h-3.5 w-3.5" />
+                設定待ち
+              </span>
+              <Button
+                type="button"
+                onClick={unregisterWebhook}
+                variant="outline"
+                size="xs"
+                className="px-3 text-xs"
+              >
+                解除
+              </Button>
+            </div>
+            <p className="text-right text-xs text-muted-foreground">
+              オーナーの Webhook 設定後に有効になります
+            </p>
+          </div>
+        )}
 
         {(status === "registering" || status === "unregistering") && (
           <span className="text-xs text-muted-foreground">

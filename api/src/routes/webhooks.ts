@@ -309,7 +309,7 @@ webhooksRoute.post(
         `GitHub webhook 作成: 権限なし (status=${res.status}) repo=${repo} user=${githubLogin}`
       );
       await addWebhookRecord(c.env.WEBHOOK_KV, user.id, repo, null);
-      return c.json({ ok: true });
+      return c.json({ ok: true, message: "no_admin_access" });
     }
 
     if (!res.ok) {
