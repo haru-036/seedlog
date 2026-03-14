@@ -197,7 +197,13 @@ export const repoSchema = z.object({
 
 export const reposQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  per_page: z.coerce.number().int().min(1).max(100).default(20)
+  per_page: z.coerce.number().int().min(1).max(100).default(20),
+  query: z
+    .string()
+    .trim()
+    .max(100)
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined))
 });
 
 export const reposResponseSchema = z.object({
