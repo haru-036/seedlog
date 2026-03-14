@@ -17,6 +17,12 @@ type GitHubRepo = {
   private: boolean;
   description: string | null;
   updated_at: string;
+  owner: {
+    type: string;
+  };
+  permissions?: {
+    admin: boolean;
+  };
 };
 
 type RepoListItem = ReposResponse["repos"][number];
@@ -47,6 +53,19 @@ function isGitHubRepo(value: unknown): value is GitHubRepo {
     return false;
   }
 
+  const owner = value.owner;
+  if (!isRecord(owner) || typeof owner.type !== "string") {
+    return false;
+  }
+
+  const permissions = value.permissions;
+  if (
+    permissions !== undefined &&
+    (!isRecord(permissions) || typeof permissions.admin !== "boolean")
+  ) {
+    return false;
+  }
+
   return (
     typeof value.name === "string" &&
     typeof value.full_name === "string" &&
@@ -58,6 +77,17 @@ function isGitHubRepo(value: unknown): value is GitHubRepo {
 
 function isGitHubRepoArray(value: unknown): value is GitHubRepo[] {
   return Array.isArray(value) && value.every((repo) => isGitHubRepo(repo));
+}
+
+function isOrganizationRepo(repo: GitHubRepo): boolean {
+  return repo.owner.type.toLowerCase() === "organization";
+}
+
+function shouldIncludeRepo(repo: GitHubRepo): boolean {
+  if (!isOrganizationRepo(repo)) {
+    return true;
+  }
+  return repo.permissions?.admin === true;
 }
 
 async function fetchGitHubReposPage(params: {
@@ -103,13 +133,15 @@ async function fetchGitHubReposPage(params: {
     };
   }
 
-  const repos = payload.map((repo) => ({
-    name: repo.name,
-    fullName: repo.full_name,
-    private: repo.private,
-    description: repo.description,
-    updatedAt: repo.updated_at
-  }));
+  const repos = payload
+    .filter((repo) => shouldIncludeRepo(repo))
+    .map((repo) => ({
+      name: repo.name,
+      fullName: repo.full_name,
+      private: repo.private,
+      description: repo.description,
+      updatedAt: repo.updated_at
+    }));
   const link = res.headers.get("Link") ?? "";
   const hasNextPage = link.includes('rel="next"');
 
@@ -233,25 +265,7 @@ reposRoute.get(
 
     const { page, per_page, query } = c.req.valid("query");
 
-    if (!query) {
-      const result = await fetchGitHubReposPage({
-        accessToken,
-        page,
-        perPage: per_page
-      });
-      if (!result.ok) {
-        return githubReposErrorResponse(c, result.status, result.error);
-      }
-
-      c.header("Cache-Control", "private, no-store");
-      c.header("Vary", "Cookie");
-      return c.json({
-        repos: result.repos,
-        hasNextPage: result.hasNextPage
-      } satisfies ReposResponse);
-    }
-
-    const keyword = query.toLowerCase();
+    const keyword = query?.toLowerCase();
     const startIndex = (page - 1) * per_page;
     const endExclusive = startIndex + per_page;
     let matchedCount = 0;
@@ -282,7 +296,7 @@ reposRoute.get(
             .toLowerCase()
             .trim();
 
-        if (!searchable.includes(keyword)) {
+        if (keyword && !searchable.includes(keyword)) {
           continue;
         }
 
@@ -303,9 +317,10 @@ reposRoute.get(
     const truncatedByGitHubCap =
       hasGitHubNextPage && scannedItems >= GITHUB_REPOS_SCAN_MAX_ITEMS;
     const incomplete = truncatedByScanLimit || truncatedByGitHubCap;
-    const message = incomplete
-      ? `検索対象が上限(${GITHUB_REPOS_SCAN_MAX_ITEMS}件)に達したため、結果が一部のみ表示されています`
-      : undefined;
+    const message =
+      query && incomplete
+        ? `検索対象が上限(${GITHUB_REPOS_SCAN_MAX_ITEMS}件)に達したため、結果が一部のみ表示されています`
+        : undefined;
 
     c.header("Cache-Control", "private, no-store");
     c.header("Vary", "Cookie");

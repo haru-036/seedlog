@@ -406,7 +406,7 @@ authRoute.get("/github", (c) => {
   const params = new URLSearchParams({
     client_id: c.env.GITHUB_CLIENT_ID,
     redirect_uri: c.env.GITHUB_REDIRECT_URI,
-    scope: "admin:repo_hook read:user",
+    scope: "repo read:org admin:repo_hook read:user",
     state
   });
   return c.redirect(`${GITHUB_OAUTH_URL}?${params}`);
