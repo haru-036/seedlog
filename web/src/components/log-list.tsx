@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { LogCard } from "./log-card";
 import { FileText } from "lucide-react";
-import type { Log } from "./dashboard-client";
+import type { LogResponse } from "@seedlog/schema";
 
 interface LogListProps {
-  logs: Log[];
+  logs: LogResponse[];
   onLogDeleted?: (id: string) => void;
 }
 

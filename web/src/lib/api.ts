@@ -1,3 +1,5 @@
+import type { UserResponse } from "@seedlog/schema";
+
 export const API_BASE =
   import.meta.env.VITE_API_BASE ?? "https://seedlog-api.harurahu.workers.dev";
 
@@ -22,4 +24,18 @@ export async function fetcher<T>(path: string): Promise<T> {
     throw new Error(`API error: ${res.status}`);
   }
   return res.json() as Promise<T>;
+}
+
+export async function fetchCurrentUser(): Promise<UserResponse | null> {
+  const res = await apiFetch("/api/auth/me");
+
+  if (res.status === 401 || res.status === 404) {
+    return null;
+  }
+
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status}`);
+  }
+
+  return res.json() as Promise<UserResponse>;
 }

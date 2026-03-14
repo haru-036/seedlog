@@ -1,33 +1,26 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import useSWR, { mutate } from "swr";
+import type { LogsListResponse } from "@seedlog/schema";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { LogForm } from "@/components/log-form";
 import { LogList } from "@/components/log-list";
 import { AIPanel } from "@/components/ai-panel";
-import { fetcher } from "@/lib/api";
+import { fetchCurrentUser, fetcher } from "@/lib/api";
 import { RepoSelectorPanel } from "@/components/repo-selector-panel";
 
-// バックエンドのスキーマに合わせた型定義
-export interface Log {
-  id: string;
-  userId: string;
-  questionId: string | null;
-  content: string;
-  source: "github_push" | "discord_command" | "discord_reply" | "web";
-  createdAt: string;
-}
-
-interface LogsResponse {
-  logs: Log[];
-  total: number;
-  hasMore: boolean;
-}
-
 export function DashboardClient() {
+  const { data: currentUser } = useSWR("/api/auth/me", fetchCurrentUser);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem("githubLogin", currentUser.githubLogin);
+    }
+  }, [currentUser]);
+
   // バックエンドの /api/logs からデータを取得
-  const { data } = useSWR<LogsResponse>("/api/logs", fetcher, {
+  const { data } = useSWR<LogsListResponse>("/api/logs", fetcher, {
     onError: (err) => console.warn("API fetch failed:", err.message)
   });
 
@@ -77,7 +70,7 @@ export function DashboardClient() {
           </div>
           <div className="lg:col-span-1 space-y-4 lg:space-y-6">
             <RepoSelectorPanel />
-            <AIPanel logs={logs as any} />
+            <AIPanel logs={logs} />
           </div>
         </div>
       </main>
