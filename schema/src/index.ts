@@ -55,11 +55,22 @@ export type GitHubPushPayload = z.infer<typeof githubPushPayloadSchema>;
 // ---- Discord Interactions ----
 
 export const discordInteractionSchema = z.object({
+  application_id: z.string().optional(),
+  token: z.string().optional(),
   type: z.number().int(),
   data: z
     .object({
       custom_id: z.string().optional(),
       name: z.string().optional(),
+      options: z
+        .array(
+          z.object({
+            name: z.string(),
+            type: z.number().int(),
+            value: z.string().optional()
+          })
+        )
+        .optional(),
       components: z
         .array(
           z.object({

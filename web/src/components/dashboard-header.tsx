@@ -25,7 +25,9 @@ export function DashboardHeader() {
   return (
     <>
       <header className="border-b border-neutral-800 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold">🌱 Seedlog</h1>
+        <h1 className="text-xl font-bold flex items-center gap-2">
+          <img src="/logo.png" alt="Seedlog" className="size-8" /> Seedlog
+        </h1>
         <div className="flex items-center gap-4">
           {githubLogin && (
             <span className="text-sm text-muted-foreground">

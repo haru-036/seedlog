@@ -1,4 +1,4 @@
-import { and, count, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { nanoid } from "nanoid";
 import { describeRoute, resolver, validator } from "hono-openapi";
@@ -53,7 +53,7 @@ logsRoute.get(
         .select()
         .from(logs)
         .where(where)
-        .orderBy(logs.createdAt, logs.id)
+        .orderBy(desc(logs.createdAt), logs.id)
         .limit(limit)
         .offset(offset)
         .all(),

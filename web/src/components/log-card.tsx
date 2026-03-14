@@ -1,31 +1,63 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Trash2, MoreHorizontal } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
+import { Trash2 } from "lucide-react";
 import type { LogResponse } from "@seedlog/schema";
 import { apiFetch } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 interface LogCardProps {
   log: LogResponse;
   onDeleted?: (id: string) => void;
 }
 
+function formatTime(dateString: string): string {
+  return new Date(dateString).toLocaleTimeString("ja-JP", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function getSourceLabel(source: string): string | null {
+  switch (source) {
+    case "github_push":
+      return null;
+    case "discord_command":
+      return "Discord";
+    case "discord_reply":
+      return "質問に回答";
+    default:
+      return "Web";
+  }
+}
+
+function getDotColor(source: string): string {
+  switch (source) {
+    case "github_push":
+      return "bg-slate-400";
+    case "discord_command":
+      return "bg-indigo-500";
+    case "discord_reply":
+      return "bg-violet-500";
+    default:
+      return "bg-sky-500";
+  }
+}
+
 export function LogCard({ log, onDeleted }: LogCardProps) {
   const [isPending, setIsPending] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const normalizedContent = log.content.replace(/\r\n/g, "\n").trim();
+  const isLong =
+    normalizedContent.length > 120 || normalizedContent.split("\n").length > 3;
+  const sourceLabel = getSourceLabel(log.source);
 
   const handleDelete = async () => {
     setIsPending(true);
     try {
-      // 自作APIでの削除処理（エンドポイントがある想定）
       await apiFetch(`/api/logs/${log.id}`, { method: "DELETE" });
       setShowConfirm(false);
       onDeleted?.(log.id);
@@ -36,89 +68,78 @@ export function LogCard({ log, onDeleted }: LogCardProps) {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("ja-JP", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-  };
-
-  // ソース（記録元）を見やすい名前に変換
-  const getSourceLabel = (source: string) => {
-    switch (source) {
-      case "github_push":
-        return "GitHub Push";
-      case "discord_command":
-      case "discord_reply":
-        return "Discord";
-      default:
-        return "Web";
-    }
-  };
-
-  // 本文の1行目をタイトル代わりにする
-  const lines = (log.content ?? "").split("\n");
-  const pseudoTitle =
-    lines[0].slice(0, 50) + (lines[0].length > 50 ? "..." : "");
-  const restContent = lines.slice(1).join("\n").trim();
-
   return (
-    <Card className="border-border/50 group">
-      <CardHeader className="flex flex-row items-start justify-between py-3 gap-2">
-        <div className="flex flex-col gap-1 min-w-0 flex-1">
-          {/* 1行目をタイトル風に表示 */}
-          <CardTitle className="text-base font-medium truncate">
-            {pseudoTitle || "無題のログ"}
-          </CardTitle>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs text-muted-foreground">
-              {formatDate(log.createdAt)}
-            </span>
-            {/* Sourceをバッジとして表示 */}
-            <span className="px-2 py-0.5 rounded-full text-[10px] bg-secondary text-muted-foreground">
-              {getSourceLabel(log.source)}
-            </span>
+    <div className="group relative flex gap-3">
+      {/* タイムライン: ドット + 縦線 */}
+      <div className="flex flex-col items-center">
+        <div
+          className={cn(
+            "mt-2 h-2 w-2 shrink-0 rounded-full ring-2 ring-background",
+            getDotColor(log.source)
+          )}
+        />
+        <div className="mt-1 w-px flex-1 bg-border" />
+      </div>
+
+      {/* コンテンツ */}
+      <div className="min-w-0 flex-1 pb-8">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            {/* メタ行 */}
+            <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {formatTime(log.createdAt)}
+              </span>
+              {sourceLabel && (
+                <span className="text-xs text-muted-foreground/70">
+                  {sourceLabel}
+                </span>
+              )}
+              {log.repo && (
+                <span className="max-w-[16rem] truncate text-xs text-muted-foreground/50">
+                  {log.repo}
+                </span>
+              )}
+            </div>
+
+            {/* 本文 */}
+            <p
+              className={cn(
+                "wrap-break-word whitespace-pre-wrap text-sm leading-relaxed text-foreground",
+                !isExpanded && isLong && "line-clamp-3"
+              )}
+            >
+              {normalizedContent || "内容がありません"}
+            </p>
+            {isLong && (
+              <button
+                type="button"
+                onClick={() => setIsExpanded((v) => !v)}
+                className="mt-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {isExpanded ? "折りたたむ" : "続きを見る"}
+              </button>
+            )}
           </div>
+
+          {/* 削除ボタン */}
+          <button
+            type="button"
+            onClick={() => setShowConfirm(true)}
+            className="mt-0.5 shrink-0 rounded p-1 text-muted-foreground opacity-100 transition-opacity hover:text-destructive md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 focus-visible:opacity-100"
+            aria-label="削除"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => setShowConfirm(true)}
-              className="text-destructive"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              削除
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </CardHeader>
+      </div>
 
-      {restContent && (
-        <CardContent className="pt-0">
-          <p className="text-sm text-muted-foreground whitespace-pre-wrap mb-2">
-            {restContent}
-          </p>
-        </CardContent>
-      )}
-
+      {/* 削除確認オーバーレイ（行全体を覆う） */}
       {showConfirm && (
-        <div className="absolute inset-0 bg-background/95 flex items-center justify-center rounded-lg">
+        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/95">
           <div className="flex flex-col gap-3 p-4 text-center">
             <p className="text-sm">このログを削除しますか？</p>
-            <div className="flex gap-2 justify-center">
+            <div className="flex justify-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -139,6 +160,6 @@ export function LogCard({ log, onDeleted }: LogCardProps) {
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
