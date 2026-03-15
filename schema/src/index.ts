@@ -219,8 +219,29 @@ export const episodeResponseSchema = z.object({
   episode: z.string()
 });
 
+export const episodesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  offset: z.coerce.number().int().min(0).default(0)
+});
+
+export const episodeItemSchema = z.object({
+  id: z.string(),
+  prompt: z.string(),
+  content: z.string(),
+  createdAt: z.string()
+});
+
+export const episodesListResponseSchema = z.object({
+  episodes: z.array(episodeItemSchema),
+  total: z.coerce.number().int().min(0),
+  hasMore: z.boolean()
+});
+
 export type EpisodeRequest = z.infer<typeof episodeRequestSchema>;
 export type EpisodeResponse = z.infer<typeof episodeResponseSchema>;
+export type EpisodesQuery = z.infer<typeof episodesQuerySchema>;
+export type EpisodeItem = z.infer<typeof episodeItemSchema>;
+export type EpisodesListResponse = z.infer<typeof episodesListResponseSchema>;
 
 // ---- Repos ----
 
