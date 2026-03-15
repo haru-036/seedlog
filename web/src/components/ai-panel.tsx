@@ -17,7 +17,6 @@ import {
   TrendingUp,
   Sparkles,
   InfoIcon,
-  ChevronDown,
   Clock3,
   ScrollText
 } from "lucide-react";
@@ -37,7 +36,12 @@ import type {
   EpisodesListResponse
 } from "@seedlog/schema";
 import { Alert, AlertTitle } from "./ui/alert";
-import { cn } from "@/lib/utils";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger
+} from "./ui/accordion";
 
 type AIType = "lt" | "es" | "growth";
 
@@ -87,11 +91,13 @@ function formatCreatedAt(createdAt: string): string {
 export function AIPanel() {
   const [customPrompt, setCustomPrompt] = useState("");
   const [episodeContent, setEpisodeContent] = useState("");
+  const [episodesPage, setEpisodesPage] = useState(1);
   const [expandedEpisodeId, setExpandedEpisodeId] = useState<string | null>(
     null
   );
 
-  const episodesKey = `/api/episodes?limit=${EPISODES_PAGE_SIZE}&offset=0`;
+  const episodesOffset = (episodesPage - 1) * EPISODES_PAGE_SIZE;
+  const episodesKey = `/api/episodes?limit=${EPISODES_PAGE_SIZE}&offset=${episodesOffset}`;
   const {
     data: episodesData,
     mutate: mutateEpisodes,
@@ -118,6 +124,7 @@ export function AIPanel() {
     try {
       const response = await trigger({ prompt: customPrompt });
       setEpisodeContent(response.episode);
+      setEpisodesPage(1);
       await mutateEpisodes();
     } catch (error) {
       console.error("AI生成に失敗:", error);
@@ -126,6 +133,11 @@ export function AIPanel() {
 
   const episodes = episodesData?.episodes ?? [];
   const totalEpisodes = episodesData?.total ?? 0;
+  const hasMoreEpisodes = episodesData?.hasMore ?? false;
+  const totalEpisodePages = Math.max(
+    1,
+    Math.ceil(totalEpisodes / EPISODES_PAGE_SIZE)
+  );
 
   useEffect(() => {
     if (episodes.length === 0) {
@@ -144,10 +156,8 @@ export function AIPanel() {
     }
   }, [episodes, expandedEpisodeId]);
 
-  const handleToggleEpisode = (episodeId: string) => {
-    setExpandedEpisodeId((current) =>
-      current === episodeId ? null : episodeId
-    );
+  const handleToggleEpisode = (value: string) => {
+    setExpandedEpisodeId(value.length > 0 ? value : null);
   };
 
   return (
@@ -254,59 +264,78 @@ export function AIPanel() {
               <p className="text-xs text-muted-foreground">
                 全{totalEpisodes}件
               </p>
-              {episodes.map((episode) => {
-                const title = extractEpisodeTitle(
-                  episode.content,
-                  episode.createdAt
-                );
-                const preview = extractPreview(episode.content);
-                const isOpen = expandedEpisodeId === episode.id;
+              <Accordion
+                type="single"
+                collapsible
+                value={expandedEpisodeId ?? ""}
+                onValueChange={handleToggleEpisode}
+                className="rounded-lg border border-border/70 bg-background px-4"
+              >
+                {episodes.map((episode) => {
+                  const title = extractEpisodeTitle(
+                    episode.content,
+                    episode.createdAt
+                  );
+                  const preview = extractPreview(episode.content);
 
-                return (
-                  <div
-                    key={episode.id}
-                    className="overflow-hidden rounded-lg border border-border/70 bg-background"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleToggleEpisode(episode.id)}
-                      className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
-                    >
-                      <div className="min-w-0 space-y-1">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {title}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                          <span className="inline-flex items-center gap-1">
-                            <Clock3 className="h-3 w-3" />
-                            {formatCreatedAt(episode.createdAt)}
-                          </span>
-                          <span>{episode.content.length}文字</span>
+                  return (
+                    <AccordionItem key={episode.id} value={episode.id}>
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="min-w-0 space-y-1">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {title}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-1">
+                              <Clock3 className="h-3 w-3" />
+                              {formatCreatedAt(episode.createdAt)}
+                            </span>
+                            <span>{episode.content.length}文字</span>
+                          </div>
+                          <p className="line-clamp-2 text-xs text-muted-foreground">
+                            {preview || "プレビューを表示できません"}
+                          </p>
                         </div>
-                        <p className="line-clamp-2 text-xs text-muted-foreground">
-                          {preview || "プレビューを表示できません"}
-                        </p>
-                      </div>
-                      <ChevronDown
-                        className={cn(
-                          "mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                          isOpen && "rotate-180"
-                        )}
-                      />
-                    </button>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="rounded-md border border-border/70 bg-muted/15 px-4 py-3">
+                          <div className="prose prose-sm max-h-112 max-w-none overflow-y-auto wrap-break-word text-foreground leading-7">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {episode.content}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
 
-                    {isOpen && (
-                      <div className="border-t border-border/70 bg-muted/15 px-4 py-3">
-                        <div className="prose prose-sm max-h-112 max-w-none overflow-y-auto wrap-break-word text-foreground leading-7">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {episode.content}
-                          </ReactMarkdown>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              <div className="flex items-center justify-between gap-2 border-t border-border/50 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={episodesPage <= 1}
+                  onClick={() =>
+                    setEpisodesPage((page) => Math.max(1, page - 1))
+                  }
+                >
+                  前へ
+                </Button>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {episodesPage} / {totalEpisodePages}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!hasMoreEpisodes}
+                  onClick={() => setEpisodesPage((page) => page + 1)}
+                >
+                  次へ
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
