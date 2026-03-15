@@ -92,9 +92,8 @@ export function AIPanel() {
   const [customPrompt, setCustomPrompt] = useState("");
   const [episodeContent, setEpisodeContent] = useState("");
   const [episodesPage, setEpisodesPage] = useState(1);
-  const [expandedEpisodeId, setExpandedEpisodeId] = useState<string | null>(
-    null
-  );
+  // '' means all closed, string means open
+  const [expandedEpisodeId, setExpandedEpisodeId] = useState<string>("");
 
   const episodesOffset = (episodesPage - 1) * EPISODES_PAGE_SIZE;
   const episodesKey = `/api/episodes?limit=${EPISODES_PAGE_SIZE}&offset=${episodesOffset}`;
@@ -139,25 +138,22 @@ export function AIPanel() {
     Math.ceil(totalEpisodes / EPISODES_PAGE_SIZE)
   );
 
+  // ページ切り替えやデータ更新時に、開いていたIDが消えたら全閉じにする
   useEffect(() => {
     if (episodes.length === 0) {
-      setExpandedEpisodeId(null);
+      setExpandedEpisodeId("");
       return;
     }
-
-    if (!expandedEpisodeId) {
-      setExpandedEpisodeId(episodes[0]?.id ?? null);
-      return;
-    }
-
-    const exists = episodes.some((episode) => episode.id === expandedEpisodeId);
-    if (!exists) {
-      setExpandedEpisodeId(episodes[0]?.id ?? null);
+    if (
+      expandedEpisodeId &&
+      !episodes.some((e) => e.id === expandedEpisodeId)
+    ) {
+      setExpandedEpisodeId("");
     }
   }, [episodes, expandedEpisodeId]);
 
   const handleToggleEpisode = (value: string) => {
-    setExpandedEpisodeId(value.length > 0 ? value : null);
+    setExpandedEpisodeId(value);
   };
 
   return (
@@ -267,7 +263,7 @@ export function AIPanel() {
               <Accordion
                 type="single"
                 collapsible
-                value={expandedEpisodeId ?? ""}
+                value={expandedEpisodeId.trim()}
                 onValueChange={handleToggleEpisode}
                 className="rounded-lg border border-border/70 bg-background px-4"
               >
@@ -299,7 +295,7 @@ export function AIPanel() {
                       </AccordionTrigger>
                       <AccordionContent>
                         <div className="rounded-md border border-border/70 bg-muted/15 px-4 py-3">
-                          <div className="prose prose-sm max-h-112 max-w-none overflow-y-auto wrap-break-word text-foreground leading-7">
+                          <div className="prose prose-invert prose-sm max-h-112 max-w-none overflow-y-auto wrap-break-word text-foreground leading-7">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                               {episode.content}
                             </ReactMarkdown>
