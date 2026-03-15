@@ -521,6 +521,36 @@ offset?: number
 
 ## エピソード
 
+### `GET /api/episodes` ✅ 実装済み 🔒
+
+ログから生成済みのエピソード一覧を新しい順で取得する。
+
+**Query Parameters**
+
+| パラメータ | 型     | デフォルト | 説明                         |
+| ---------- | ------ | ---------- | ---------------------------- |
+| `limit`    | number | `10`       | 1回で取得する件数（最大50）  |
+| `offset`   | number | `0`        | 先頭からのスキップ件数       |
+
+**Response** `200 OK`
+
+```typescript
+{
+  episodes: {
+    id: string;
+    prompt: string;
+    content: string; // Markdown本文
+    createdAt: string; // ISO 8601
+  }[];
+  total: number;
+  hasMore: boolean;
+}
+```
+
+**Error Responses**
+
+- `401 Unauthorized` — 未認証
+
 ### `POST /api/episodes` ✅ 実装済み 🔒
 
 過去のログをAIで整理・要約して返す。「LTネタまとめて」などのプロンプトに応答する。

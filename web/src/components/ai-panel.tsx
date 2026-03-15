@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,9 +16,12 @@ import {
   FileText,
   TrendingUp,
   Sparkles,
-  InfoIcon
+  InfoIcon,
+  ChevronDown,
+  Clock3,
+  ScrollText
 } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, fetcher } from "@/lib/api";
 import { ButtonGroup } from "./ui/button-group";
 import {
   InputGroup,
@@ -27,8 +30,14 @@ import {
   InputGroupTextarea
 } from "./ui/input-group";
 import useSWRMutation from "swr/mutation";
-import type { EpisodeRequest, EpisodeResponse } from "@seedlog/schema";
+import useSWR from "swr";
+import type {
+  EpisodeRequest,
+  EpisodeResponse,
+  EpisodesListResponse
+} from "@seedlog/schema";
 import { Alert, AlertTitle } from "./ui/alert";
+import { cn } from "@/lib/utils";
 
 type AIType = "lt" | "es" | "growth";
 
@@ -40,9 +49,55 @@ const DEFAULT_PROMPTS = {
     "直近のログから技術的な挑戦と、次に学ぶべきおすすめの技術スタックを中心に成長を分析してください。"
 };
 
+const EPISODES_PAGE_SIZE = 20;
+
+function extractEpisodeTitle(content: string, createdAt: string): string {
+  const normalized = content.replace(/\r\n/g, "\n");
+  const lines = normalized.split("\n").map((line) => line.trim());
+  const firstNonEmpty = lines.find((line) => line.length > 0) ?? "";
+  const headingLike = firstNonEmpty.replace(/^#+\s*/, "").trim();
+  const titleSource = headingLike || firstNonEmpty;
+
+  if (titleSource.length > 0) {
+    return titleSource.slice(0, 80);
+  }
+
+  return `${new Date(createdAt).toLocaleDateString("ja-JP")} のエピソード`;
+}
+
+function extractPreview(content: string): string {
+  const normalized = content
+    .replace(/\r\n/g, "\n")
+    .replace(/^#+\s*/gm, "")
+    .replace(/\*\*|__|`/g, "")
+    .trim();
+
+  return normalized.slice(0, 140);
+}
+
+function formatCreatedAt(createdAt: string): string {
+  return new Date(createdAt).toLocaleString("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
 export function AIPanel() {
   const [customPrompt, setCustomPrompt] = useState("");
   const [episodeContent, setEpisodeContent] = useState("");
+  const [expandedEpisodeId, setExpandedEpisodeId] = useState<string | null>(
+    null
+  );
+
+  const episodesKey = `/api/episodes?limit=${EPISODES_PAGE_SIZE}&offset=0`;
+  const {
+    data: episodesData,
+    mutate: mutateEpisodes,
+    isLoading: isEpisodesLoading
+  } = useSWR<EpisodesListResponse>(episodesKey, fetcher);
+
   const { trigger, isMutating, error } = useSWRMutation(
     "/api/episodes",
     async (url: string, { arg }: { arg: EpisodeRequest }) => {
@@ -62,12 +117,37 @@ export function AIPanel() {
   const handleGenerate = async () => {
     try {
       const response = await trigger({ prompt: customPrompt });
-      // 生成された内容を表示するなどの処理をここに追加
       setEpisodeContent(response.episode);
-      console.log("AI Response:", response);
+      await mutateEpisodes();
     } catch (error) {
       console.error("AI生成に失敗:", error);
     }
+  };
+
+  const episodes = episodesData?.episodes ?? [];
+  const totalEpisodes = episodesData?.total ?? 0;
+
+  useEffect(() => {
+    if (episodes.length === 0) {
+      setExpandedEpisodeId(null);
+      return;
+    }
+
+    if (!expandedEpisodeId) {
+      setExpandedEpisodeId(episodes[0]?.id ?? null);
+      return;
+    }
+
+    const exists = episodes.some((episode) => episode.id === expandedEpisodeId);
+    if (!exists) {
+      setExpandedEpisodeId(episodes[0]?.id ?? null);
+    }
+  }, [episodes, expandedEpisodeId]);
+
+  const handleToggleEpisode = (episodeId: string) => {
+    setExpandedEpisodeId((current) =>
+      current === episodeId ? null : episodeId
+    );
   };
 
   return (
@@ -140,15 +220,97 @@ export function AIPanel() {
           )}
         </CardContent>
       </Card>
-      {episodeContent && (
-        <Card>
-          <CardContent className="prose prose-invert max-w-none w-full">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {episodeContent}
-            </ReactMarkdown>
-          </CardContent>
-        </Card>
-      )}
+
+      <Card className="border-border/50 bg-card/50 backdrop-blur">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <ScrollText className="h-4 w-4 text-primary" />
+            エピソード
+          </CardTitle>
+          <CardDescription>
+            生成済みエピソードをその場で展開して確認できます
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {episodeContent && (
+            <Alert>
+              <InfoIcon />
+              <AlertTitle>
+                生成が完了しました。最新の内容は一覧の先頭から確認できます。
+              </AlertTitle>
+            </Alert>
+          )}
+
+          {isEpisodesLoading ? (
+            <p className="text-sm text-muted-foreground">読み込み中...</p>
+          ) : episodes.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border/70 bg-muted/15 px-4 py-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                まだエピソードがありません。上のフォームから生成するとここに表示されます。
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                全{totalEpisodes}件
+              </p>
+              {episodes.map((episode) => {
+                const title = extractEpisodeTitle(
+                  episode.content,
+                  episode.createdAt
+                );
+                const preview = extractPreview(episode.content);
+                const isOpen = expandedEpisodeId === episode.id;
+
+                return (
+                  <div
+                    key={episode.id}
+                    className="overflow-hidden rounded-lg border border-border/70 bg-background"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleToggleEpisode(episode.id)}
+                      className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                    >
+                      <div className="min-w-0 space-y-1">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {title}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          <span className="inline-flex items-center gap-1">
+                            <Clock3 className="h-3 w-3" />
+                            {formatCreatedAt(episode.createdAt)}
+                          </span>
+                          <span>{episode.content.length}文字</span>
+                        </div>
+                        <p className="line-clamp-2 text-xs text-muted-foreground">
+                          {preview || "プレビューを表示できません"}
+                        </p>
+                      </div>
+                      <ChevronDown
+                        className={cn(
+                          "mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                          isOpen && "rotate-180"
+                        )}
+                      />
+                    </button>
+
+                    {isOpen && (
+                      <div className="border-t border-border/70 bg-muted/15 px-4 py-3">
+                        <div className="prose prose-sm max-h-112 max-w-none overflow-y-auto wrap-break-word text-foreground leading-7">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {episode.content}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
